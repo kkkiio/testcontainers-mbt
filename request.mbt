@@ -43,7 +43,11 @@ pub(all) enum WaitStrategy {
   /// Wait unconditionally. Useful as a quick and dirty fallback; prefer a real
   /// readiness signal.
   Seconds(Int32)
-  /// Wait until a TCP connection to the *host-mapped* port succeeds.
+  /// Wait until the port is LISTENing inside the container, checked via
+  /// `/proc/net/tcp`. Probing inside the container avoids the docker-proxy
+  /// false positive, where the proxy accepts connections on a published port
+  /// even though nothing inside listens yet. For images without procfs (or
+  /// `cat`) it falls back to a TCP connection to the host-mapped port.
   TcpPort(Int32)
   /// Wait until `GET http://<host>:<mapped port><path>` returns `status`.
   ///

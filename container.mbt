@@ -512,8 +512,13 @@ async fn Container::resolve_ports(
   let max_attempts = 50
   let mut attempt = 0
   let mut missing : Array[Int32] = []
+  // Resolved bindings are collected per attempt and committed only when every
+  // requested port is mapped; pushing them into `self.ports` inside the loop
+  // would duplicate entries whenever a retry follows a partial resolution.
+  let mut resolved : Array[(Int32, Int32)] = []
   while attempt < max_attempts {
     missing = []
+    resolved = []
     let json = inspect_container(self.id)
     let network_settings = match json_index(json, 0) {
       Some(container) => json_field(container, "NetworkSettings")
@@ -527,13 +532,16 @@ async fn Container::resolve_ports(
       match bindings {
         Some(bindings) =>
           match host_port_from_bindings(bindings, port) {
-            Some(host_port) => self.ports.push((port, host_port))
+            Some(host_port) => resolved.push((port, host_port))
             None => missing.push(port)
           }
         None => missing.push(port)
       }
     }
     if missing.length() == 0 {
+      for pair in resolved {
+        self.ports.push(pair)
+      }
       return
     }
     // A container that died before its ports were published will never
@@ -599,11 +607,107 @@ fn parse_port_number(value : String) -> Int32? {
 }
 
 ///|
-fn docker_host() -> String {
+/// Host name or IP that reaches the container's published ports.
+///
+/// Resolution follows testcontainers-go's `DaemonHost`:
+/// `TESTCONTAINERS_HOST_OVERRIDE` wins; otherwise a `tcp://`, `http://` or
+/// `https://` `DOCKER_HOST` gives the remote daemon's hostname; otherwise
+/// (unix/npipe socket or unset) the host is `localhost` — unless the tests
+/// themselves run inside a container, where the default network's gateway IP
+/// is the host. Never raises: failures fall back to `localhost`.
+async fn docker_host() -> String noraise {
   match @env.get_env_var("TESTCONTAINERS_HOST_OVERRIDE") {
-    Some(host) if host != "" => host
-    _ => "localhost"
+    Some(host) if host != "" => return host
+    _ => ()
   }
+  let docker_host = match @env.get_env_var("DOCKER_HOST") {
+    Some(host) => host
+    None => ""
+  }
+  match uri_scheme(docker_host) {
+    "tcp" | "http" | "https" => uri_hostname(docker_host)
+    _ =>
+      if in_a_container() {
+        gateway_host() catch {
+          _ => "localhost"
+        }
+      } else {
+        "localhost"
+      }
+  }
+}
+
+///|
+/// The scheme of a docker host URI: `tcp` for `tcp://host:2375`, `unix` for
+/// `unix:///var/run/docker.sock`, or `""` when the value has no `scheme://`
+/// prefix (e.g. a bare socket path).
+fn uri_scheme(uri : String) -> String {
+  let parts = uri.split("://").to_array()
+  if parts.length() < 2 {
+    return ""
+  }
+  parts[0].to_owned()
+}
+
+///|
+/// The hostname of a `tcp://`, `http://` or `https://` docker host URI.
+/// Userinfo, port and path are dropped; brackets are stripped from IPv6
+/// literals — `join_host_port` puts them back when rendering an endpoint.
+fn uri_hostname(uri : String) -> String {
+  let after_scheme = uri.split("://").to_array()
+  if after_scheme.length() < 2 {
+    return uri
+  }
+  let authority = after_scheme[1].split("/").to_array()[0].to_owned()
+  // `ssh://user@host`-style URIs carry a userinfo part; keep only the host.
+  let userinfo = authority.split("@").to_array()
+  let host_port = userinfo[userinfo.length() - 1].to_owned()
+  if host_port.has_prefix("[") {
+    let v6 = host_port.split("]").to_array()
+    if v6.length() >= 2 {
+      return v6[0][1:].to_owned()
+    }
+  }
+  host_port.split(":").to_array()[0].to_owned()
+}
+
+///|
+/// Are the tests themselves running inside a docker container? Same heuristic
+/// as testcontainers-go's `InAContainer`: the `/.dockerenv` marker file.
+async fn in_a_container() -> Bool noraise {
+  @fs.exists("/.dockerenv") catch {
+    _ => false
+  }
+}
+
+///|
+/// Gateway IP of the default `bridge` network — how a container reaches its
+/// host. Mirrors testcontainers-go's `getGatewayIP`, which reads it from the
+/// network's IPAM config.
+async fn gateway_host() -> String raise TestContainerError {
+  let stdout = docker(["network", "inspect", "bridge"])
+  let json = @json.parse(stdout) catch {
+    e =>
+      raise UnexpectedOutput(
+        "cannot parse `docker network inspect bridge` output: \{e.to_string()}",
+      )
+  }
+  let config = match json_index(json, 0) {
+    Some(network) =>
+      match json_field(network, "IPAM") {
+        Some(ipam) => json_field(ipam, "Config")
+        None => None
+      }
+    None => None
+  }
+  if config is Some(Array(entries)) {
+    for entry in entries {
+      if json_field(entry, "Gateway") is Some(String(ip)) && ip != "" {
+        return ip
+      }
+    }
+  }
+  raise UnexpectedOutput("no gateway found in `docker network inspect bridge`")
 }
 
 ///|

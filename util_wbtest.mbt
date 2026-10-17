@@ -72,7 +72,7 @@ test "parse_port_number rejects out of range values" {
 test "describe covers every wait strategy" {
   // These strings are what WaitTimeout errors show to the user, so the whole
   // vocabulary belongs in one reviewable snapshot.
-  inspect(
+  debug_inspect(
     [
       WaitStrategy::NoWait.describe(),
       WaitStrategy::Seconds(5).describe(),
@@ -89,7 +89,18 @@ test "describe covers every wait strategy" {
       WaitStrategy::Any([WaitStrategy::TcpPort(1), WaitStrategy::Exit(3)]).describe(),
     ],
     content=(
-      #|[no wait, sleep 5s, TCP port 5432, HTTP GET on port 8080 /health returning 200, log message `ready`, exec `pg_isready -h 127.0.0.1`, docker health check, container exit code 0, all of [TCP port 1, log message `ready`], any of [TCP port 1, container exit code 3]]
+      #|[
+      #|  "no wait",
+      #|  "sleep 5s",
+      #|  "TCP port 5432",
+      #|  "HTTP GET on port 8080 /health returning 200",
+      #|  "log message `ready`",
+      #|  "exec `pg_isready -h 127.0.0.1`",
+      #|  "docker health check",
+      #|  "container exit code 0",
+      #|  "all of [TCP port 1, log message `ready`]",
+      #|  "any of [TCP port 1, container exit code 3]",
+      #|]
     ),
   )
 }
@@ -142,10 +153,10 @@ test "run args" {
     .with_env("POSTGRES_PASSWORD", "a b")
     .with_label("suite", "db")
     .with_cmd(["postgres", "-c", "fsync=off"])
-  inspect(
+  debug_inspect(
     "docker " + request.run_args().join(" "),
     content=(
-      #|docker run --detach --env POSTGRES_PASSWORD=a b --label org.testcontainers.mbt=true --label suite=db --publish 5432 postgres:16-alpine postgres -c fsync=off
+      #|"docker run --detach --env POSTGRES_PASSWORD=a b --label org.testcontainers.mbt=true --label suite=db --publish 5432 postgres:16-alpine postgres -c fsync=off"
     ),
   )
 }
@@ -155,10 +166,10 @@ test "run args: entrypoint becomes --entrypoint plus leading command args" {
   let request = ContainerRequest::new("alpine")
     .with_entrypoint(["/bin/sh", "-c"])
     .with_cmd(["echo hi"])
-  inspect(
+  debug_inspect(
     "docker " + request.run_args().join(" "),
     content=(
-      #|docker run --detach --label org.testcontainers.mbt=true --entrypoint /bin/sh alpine -c echo hi
+      #|"docker run --detach --label org.testcontainers.mbt=true --entrypoint /bin/sh alpine -c echo hi"
     ),
   )
 }
@@ -168,12 +179,16 @@ test "run args: pull policy never is enforced by the daemon" {
   // Only `Never` needs a daemon flag: `Missing` is docker's default and
   // `Always` is an explicit pull in `ensure_image`.
   let base = ContainerRequest::new("alpine:3.21")
-  inspect(
+  debug_inspect(
     [PullPolicy::Missing, PullPolicy::Always, PullPolicy::Never].map(policy => {
       "docker " + base.with_pull_policy(policy).run_args().join(" ")
     }),
     content=(
-      #|[docker run --detach --label org.testcontainers.mbt=true alpine:3.21, docker run --detach --label org.testcontainers.mbt=true alpine:3.21, docker run --detach --pull never --label org.testcontainers.mbt=true alpine:3.21]
+      #|[
+      #|  "docker run --detach --label org.testcontainers.mbt=true alpine:3.21",
+      #|  "docker run --detach --label org.testcontainers.mbt=true alpine:3.21",
+      #|  "docker run --detach --pull never --label org.testcontainers.mbt=true alpine:3.21",
+      #|]
     ),
   )
 }
@@ -185,12 +200,24 @@ test "parse_listening_ports finds listeners only" {
     "   1: 0100007F:1538 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12346 1 0000000000000000 100 0 0 10 0\n" +
     "   2: 0100007F:9C40 0100007F:1F90 01 00000000:00000000 00:00000000 00000000     0        0 12347 1 0000000000000000 100 0 0 10 0\n"
   // Only LISTEN (0A) entries are returned; 40000 is ESTABLISHED (01).
-  inspect(
+  debug_inspect(
     parse_listening_ports(sample),
     content=(
       #|[8080, 5432]
     ),
   )
+}
+
+///|
+test "uri_scheme and uri_hostname split docker host URIs" {
+  assert_eq(uri_scheme("tcp://docker.example.com:2375"), "tcp")
+  assert_eq(uri_scheme("unix:///var/run/docker.sock"), "unix")
+  assert_eq(uri_scheme("/var/run/docker.sock"), "")
+  assert_eq(uri_scheme(""), "")
+  assert_eq(uri_hostname("tcp://docker.example.com:2375"), "docker.example.com")
+  assert_eq(uri_hostname("tcp://docker.example.com"), "docker.example.com")
+  assert_eq(uri_hostname("https://user@10.0.0.2:2376/certs"), "10.0.0.2")
+  assert_eq(uri_hostname("tcp://[fd00::1]:2375"), "fd00::1")
 }
 
 ///|

@@ -60,48 +60,23 @@ test "error messages are the user-facing diagnostics" {
       ),
     ),
   ]
-  inspect(
-    cases
-    .map(pair => {
+  debug_inspect(
+    cases.map(pair => {
       let (name, error) = pair
       "[\{name}]\n\{error.to_string()}"
-    })
-    .join("\n\n"),
+    }),
     content=(
-      #|[DockerNotAvailable]
-      #|Docker is not available: OSError("@process.run(): No such file or directory")
-      #|Install Docker and make sure the `docker` CLI is on your PATH:
-      #|  https://docs.docker.com/get-docker/
-      #|
-      #|[DockerCommandFailed]
-      #|docker command failed with exit code 125:
-      #|  $docker run --detach --publish 5432 postgres:16-alpine
-      #|docker: Error response from daemon: No such image
-      #|
-      #|[ImagePullFailed]
-      #|failed to pull image `ghcr.io/acme/private:1.0`:
-      #|denied: requested access to the resource is denied
-      #|
-      #|[WaitTimeout]
-      #|container did not become ready within 60000 ms (wait strategy: TCP port 5432).
-      #|Last container logs:
-      #|booting
-      #|waiting for connections
-      #|
-      #|[PortNotMapped]
-      #|container 0123456789ab does not publish port 5432. Add it with `ContainerRequest::with_port(5432)`.
-      #|
-      #|[InvalidRequest]
-      #|invalid container request: bind mount source `data` must be an absolute host path; use `with_volume` for a docker named volume
-      #|
-      #|[ContainerNotRunning]
-      #|container 0123456789ab is not running (status: exited)
-      #|
-      #|[UnexpectedOutput]
-      #|unexpected docker output: expected a container id on stdout, got: pulling from library/alpine
-      #|
-      #|[IoFailed]
-      #|I/O error: cannot create temporary directory: PermissionDenied
+      #|[
+      #|  "[DockerNotAvailable]\nDocker is not available: OSError(\"@process.run(): No such file or directory\")\nInstall Docker and make sure the `docker` CLI is on your PATH:\n  https://docs.docker.com/get-docker/",
+      #|  "[DockerCommandFailed]\ndocker command failed with exit code 125:\n  $docker run --detach --publish 5432 postgres:16-alpine\ndocker: Error response from daemon: No such image",
+      #|  "[ImagePullFailed]\nfailed to pull image `ghcr.io/acme/private:1.0`:\ndenied: requested access to the resource is denied",
+      #|  "[WaitTimeout]\ncontainer did not become ready within 60000 ms (wait strategy: TCP port 5432).\nLast container logs:\nbooting\nwaiting for connections",
+      #|  "[PortNotMapped]\ncontainer 0123456789ab does not publish port 5432. Add it with `ContainerRequest::with_port(5432)`.",
+      #|  "[InvalidRequest]\ninvalid container request: bind mount source `data` must be an absolute host path; use `with_volume` for a docker named volume",
+      #|  "[ContainerNotRunning]\ncontainer 0123456789ab is not running (status: exited)",
+      #|  "[UnexpectedOutput]\nunexpected docker output: expected a container id on stdout, got: pulling from library/alpine",
+      #|  "[IoFailed]\nI/O error: cannot create temporary directory: PermissionDenied",
+      #|]
     ),
   )
 }
