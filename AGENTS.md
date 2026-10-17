@@ -167,3 +167,12 @@ mkdir myservice
 Create `myservice/moon.pkg` with `"xziheng/testcontainers"` imported and
 `supported_targets = "native"`, then follow the layout in `postgres/postgres.mbt`
 and add `myservice/myservice_test.mbt` that starts a real container.
+
+### Release
+
+1. Bump `version` in `moon.mod` (the release tag must match it).
+2. Create a **draft** GitHub release for the `v<version>` tag.
+3. Review it, then click Publish.
+   `release.yml` triggers on `release: published`: it verifies the tag matches
+   `moon.mod`, runs `moon check` and the full container test suite, then runs
+   `moon publish` to mooncakes (needs the `MOONCAKES_TOKEN` repo secret).

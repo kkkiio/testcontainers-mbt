@@ -18,39 +18,15 @@ pub extend LogOptions with Eq::{equal, not_equal}
 pub extend LogOptions with Debug::{to_repr}
 
 ///|
-/// No tail limit, no timestamps.
-pub fn LogOptions::default() -> LogOptions {
-  { tail: None, timestamps: false, since: None, until: None, }
-}
-
-///|
-/// Keep only the last `lines` lines.
-pub fn LogOptions::with_tail(self : LogOptions, lines : Int32) -> LogOptions {
-  { ..self, tail: Some(lines), }
-}
-
-///|
-/// Prefix every line with a timestamp.
-pub fn LogOptions::with_timestamps(self : LogOptions) -> LogOptions {
-  { ..self, timestamps: true, }
-}
-
-///|
-/// Only logs newer than `timestamp` (RFC3339 or a docker duration like `10m`).
-pub fn LogOptions::with_since(
-  self : LogOptions,
-  timestamp : String,
+/// Default options: the whole log, no timestamps. Override any field with a
+/// labeled argument, e.g. `LogOptions::new(tail=50, timestamps=true)`.
+pub fn LogOptions::new(
+  tail? : Int32,
+  timestamps~ : Bool = false,
+  since? : String,
+  until? : String,
 ) -> LogOptions {
-  { ..self, since: Some(timestamp), }
-}
-
-///|
-/// Only logs older than `timestamp`.
-pub fn LogOptions::with_until(
-  self : LogOptions,
-  timestamp : String,
-) -> LogOptions {
-  { ..self, until: Some(timestamp), }
+  { tail, timestamps, since, until, }
 }
 
 ///|
@@ -97,7 +73,7 @@ pub async fn Container::logs(
 ) -> String raise TestContainerError {
   let options = match options {
     Some(options) => options
-    None => LogOptions::default()
+    None => LogOptions::new()
   }
   let split = self.logs_split(options~)
   combine_logs(split.stdout, split.stderr)
@@ -111,7 +87,7 @@ pub async fn Container::logs_split(
 ) -> LogOutput raise TestContainerError {
   let options = match options {
     Some(options) => options
-    None => LogOptions::default()
+    None => LogOptions::new()
   }
   let output = docker_command(logs_args(self.id, options))
   if output.code != 0 {
@@ -187,7 +163,7 @@ pub async fn Container::stream_logs(
 /// Used to enrich error messages; never fails.
 async fn Container::logs_for_error(self : Container) -> String {
   let result : Result[String, TestContainerError] = Ok(
-    self.logs(options=LogOptions::default().with_tail(200)),
+    self.logs(options=LogOptions::new(tail=200)),
   ) catch {
     e => Err(e)
   }

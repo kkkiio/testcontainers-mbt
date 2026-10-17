@@ -19,11 +19,7 @@ async test "postgres starts and answers queries" {
 
 ///|
 async test "postgres honours custom credentials and database" {
-  let pg = @postgres.run(
-    config=@postgres.PostgresConfig::new()
-      .with_credentials("app", "s3cr3t")
-      .with_database("appdb"),
-  )
+  let pg = @postgres.run(username="app", password="s3cr3t", database="appdb")
   defer pg.cleanup()
   let result = pg
     .container()

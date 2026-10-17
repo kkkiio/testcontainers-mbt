@@ -370,7 +370,7 @@ async fn Container::probe_http(
 ///|
 async fn Container::probe_log(self : Container, message : String) -> Probe {
   let result : Result[String, TestContainerError] = Ok(
-    self.logs(options=LogOptions::default().with_tail(WAIT_LOG_TAIL)),
+    self.logs(options=LogOptions::new(tail=WAIT_LOG_TAIL)),
   ) catch {
     e => Err(e)
   }

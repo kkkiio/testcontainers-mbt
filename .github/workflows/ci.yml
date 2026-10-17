@@ -52,7 +52,7 @@ jobs:
         run: |
           set -e
           pids=()
-          for image in postgres:16-alpine mysql:8.4 adobe/s3mock:3.9.1 hashicorp/http-echo:1.0 alpine:3.21; do
+          for image in postgres:16-alpine mysql:8.4 adobe/s3mock:3.9.1 hashicorp/http-echo:1.0 alpine:3.21 testcontainers/ryuk:0.14.0; do
             docker pull "$image" &
             pids+=("$!")
           done

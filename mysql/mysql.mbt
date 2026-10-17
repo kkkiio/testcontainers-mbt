@@ -1,5 +1,6 @@
 ///|
-/// Configuration for the MySQL module.
+/// Configuration for the MySQL module. All fields have sensible test
+/// defaults; pass labeled arguments to `new` to change them.
 pub(all) struct MySqlConfig {
   /// Docker image. Defaults to `mysql:8.4` (the current LTS release).
   image : String
@@ -27,70 +28,18 @@ pub extend MySqlConfig with Debug::{to_repr}
 
 ///|
 /// Default configuration: `mysql:8.4` with user, password and database all set
-/// to `test` and root password `test`.
-pub fn MySqlConfig::new() -> MySqlConfig {
-  {
-    image: "mysql:8.4",
-    database: "test",
-    username: "test",
-    password: "test",
-    root_password: "test",
-    port: 3306,
-    wait_timeout_ms: 90_000,
-  }
-}
-
-///|
-/// Use another image, e.g. `mysql:8.0`, `mariadb:11` or a Percona image.
-pub fn MySqlConfig::with_image(
-  self : MySqlConfig,
-  image : String,
+/// to `test` and root password `test`. Override any field with a labeled
+/// argument, e.g. `MySqlConfig::new(image="mariadb:11")`.
+pub fn MySqlConfig::new(
+  image~ : String = "mysql:8.4",
+  database~ : String = "test",
+  username~ : String = "test",
+  password~ : String = "test",
+  root_password~ : String = "test",
+  port~ : Int32 = 3306,
+  wait_timeout_ms~ : Int32 = 90_000,
 ) -> MySqlConfig {
-  { ..self, image, }
-}
-
-///|
-/// Set database name and application credentials.
-pub fn MySqlConfig::with_credentials(
-  self : MySqlConfig,
-  username : String,
-  password : String,
-) -> MySqlConfig {
-  { ..self, username, password, }
-}
-
-///|
-/// Set the database name.
-pub fn MySqlConfig::with_database(
-  self : MySqlConfig,
-  database : String,
-) -> MySqlConfig {
-  { ..self, database, }
-}
-
-///|
-/// Set the root password.
-pub fn MySqlConfig::with_root_password(
-  self : MySqlConfig,
-  root_password : String,
-) -> MySqlConfig {
-  { ..self, root_password, }
-}
-
-///|
-/// Use a different container port. Rarely needed.
-pub fn MySqlConfig::with_port(self : MySqlConfig, port : Int32) -> MySqlConfig {
-  { ..self, port, }
-}
-
-///|
-/// Set the readiness timeout in milliseconds. MySQL initialization is slower
-/// than Postgres, hence the larger default (90 seconds).
-pub fn MySqlConfig::with_wait_timeout_ms(
-  self : MySqlConfig,
-  timeout_ms : Int32,
-) -> MySqlConfig {
-  { ..self, wait_timeout_ms: timeout_ms, }
+  { image, database, username, password, root_password, port, wait_timeout_ms, }
 }
 
 ///|
@@ -102,15 +51,32 @@ pub struct MySqlContainer {
 
 ///|
 /// Start MySQL and wait until the database accepts TCP connections from the
-/// configured application user.
+/// configured application user. MySQL initialization is slower than Postgres,
+/// hence the larger default `wait_timeout_ms` (90 seconds). Every option can
+/// be overridden with a labeled argument, e.g.
+/// `@mysql.run(image="mariadb:11", database="appdb")`. `reuse` forwards to
+/// `ContainerRequest::with_reuse`.
 pub async fn run(
-  config? : MySqlConfig,
+  image~ : String = "mysql:8.4",
+  database~ : String = "test",
+  username~ : String = "test",
+  password~ : String = "test",
+  root_password~ : String = "test",
+  port~ : Int32 = 3306,
+  wait_timeout_ms~ : Int32 = 90_000,
+  reuse~ : Bool = false,
 ) -> MySqlContainer raise @testcontainers.TestContainerError {
-  let config = match config {
-    Some(config) => config
-    None => MySqlConfig::new()
-  }
+  let config = MySqlConfig::new(
+    image~,
+    database~,
+    username~,
+    password~,
+    root_password~,
+    port~,
+    wait_timeout_ms~,
+  )
   let mut request = @testcontainers.ContainerRequest::new(config.image)
+    .with_reuse(reuse~)
     .with_port(config.port)
     .with_env("MYSQL_DATABASE", config.database)
   let uses_root = config.username == "root"

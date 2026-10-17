@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish to mooncakes
+    runs-on: ubuntu-latest
+    # Tests pull the database images on a cold cache.
+    timeout-minutes: 45
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Verify release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' moon.mod)"
+          if [[ "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match moon.mod version ${version}" >&2
+            exit 1
+          fi
+
+      - name: Set up MoonBit
+        shell: bash
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "${HOME}/.moon/bin" >> "${GITHUB_PATH}"
+
+      - name: Pull test images in parallel
+        shell: bash
+        run: |
+          set -euo pipefail
+          pids=()
+          for image in postgres:16-alpine mysql:8.4 adobe/s3mock:3.9.1 hashicorp/http-echo:1.0 alpine:3.21 testcontainers/ryuk:0.14.0; do
+            docker pull "$image" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
+
+      - name: Check and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          moon version --all
+          moon update
+          moon check --target native
+          moon fmt --check
+          moon test --target native --no-parallelize
+
+      - name: Publish to mooncakes
+        shell: bash
+        env:
+          MOONCAKES_TOKEN: ${{ secrets.MOONCAKES_TOKEN }}
+        run: |
+          set -euo pipefail
+          username="$(sed -n 's/^name = "\([^/]*\)\/.*"/\1/p' moon.mod)"
+          mkdir -p "${HOME}/.moon"
+          printf '{"token":"%s","username":"%s"}' \
+            "${MOONCAKES_TOKEN}" "${username}" > "${HOME}/.moon/credentials.json"
+          moon publish

@@ -275,12 +275,10 @@ async test "log options: tail and timestamps" {
     .with_wait_timeout(120)
     .start()
   defer container.cleanup()
-  let tailed = container.logs(
-    options=@testcontainers.LogOptions::default().with_tail(2),
-  )
+  let tailed = container.logs(options=@testcontainers.LogOptions::new(tail=2))
   assert_eq(tailed.trim().to_owned(), "line-4\nline-5")
   let stamped = container.logs(
-    options=@testcontainers.LogOptions::default().with_timestamps(),
+    options=@testcontainers.LogOptions::new(timestamps=true),
   )
   // RFC3339 nanosecond timestamps look like 2026-10-17T09:00:00.000000000Z
   assert_true(stamped.contains("T"))

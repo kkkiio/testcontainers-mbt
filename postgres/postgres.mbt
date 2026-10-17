@@ -1,6 +1,6 @@
 ///|
 /// Configuration for the Postgres module. All fields have sensible test
-/// defaults; use the `with_*` methods to change one of them.
+/// defaults; pass labeled arguments to `new` to change them.
 pub(all) struct PostgresConfig {
   /// Docker image. Defaults to `postgres:16-alpine`.
   image : String
@@ -25,61 +25,17 @@ pub extend PostgresConfig with Debug::{to_repr}
 ///|
 /// Default configuration: `postgres:16-alpine` with user, password and database
 /// all set to `postgres`, like the other testcontainers implementations.
-pub fn PostgresConfig::new() -> PostgresConfig {
-  {
-    image: "postgres:16-alpine",
-    database: "postgres",
-    username: "postgres",
-    password: "postgres",
-    port: 5432,
-    wait_timeout_ms: 60_000,
-  }
-}
-
-///|
-/// Use another image, e.g. `postgres:15-alpine` or a PostGIS image.
-pub fn PostgresConfig::with_image(
-  self : PostgresConfig,
-  image : String,
+/// Override any field with a labeled argument, e.g.
+/// `PostgresConfig::new(image="postgis/postgis:16-3.4")`.
+pub fn PostgresConfig::new(
+  image~ : String = "postgres:16-alpine",
+  database~ : String = "postgres",
+  username~ : String = "postgres",
+  password~ : String = "postgres",
+  port~ : Int32 = 5432,
+  wait_timeout_ms~ : Int32 = 60_000,
 ) -> PostgresConfig {
-  { ..self, image, }
-}
-
-///|
-/// Set database name and credentials.
-pub fn PostgresConfig::with_credentials(
-  self : PostgresConfig,
-  username : String,
-  password : String,
-) -> PostgresConfig {
-  { ..self, username, password, }
-}
-
-///|
-/// Set the database name.
-pub fn PostgresConfig::with_database(
-  self : PostgresConfig,
-  database : String,
-) -> PostgresConfig {
-  { ..self, database, }
-}
-
-///|
-/// Use a different container port. Rarely needed.
-pub fn PostgresConfig::with_port(
-  self : PostgresConfig,
-  port : Int32,
-) -> PostgresConfig {
-  { ..self, port, }
-}
-
-///|
-/// Set the readiness timeout in milliseconds.
-pub fn PostgresConfig::with_wait_timeout_ms(
-  self : PostgresConfig,
-  timeout_ms : Int32,
-) -> PostgresConfig {
-  { ..self, wait_timeout_ms: timeout_ms, }
+  { image, database, username, password, port, wait_timeout_ms, }
 }
 
 ///|
@@ -97,14 +53,29 @@ pub struct PostgresContainer {
 /// defer pg.cleanup()
 /// let dsn = pg.connection_string(ssl_mode="disable")
 /// ```
+///
+/// Every option has a test-friendly default and can be overridden with a
+/// labeled argument, e.g. `@postgres.run(image="postgis/postgis:16-3.4",
+/// database="appdb")`. `reuse` forwards to `ContainerRequest::with_reuse`.
 pub async fn run(
-  config? : PostgresConfig,
+  image~ : String = "postgres:16-alpine",
+  database~ : String = "postgres",
+  username~ : String = "postgres",
+  password~ : String = "postgres",
+  port~ : Int32 = 5432,
+  wait_timeout_ms~ : Int32 = 60_000,
+  reuse~ : Bool = false,
 ) -> PostgresContainer raise @testcontainers.TestContainerError {
-  let config = match config {
-    Some(config) => config
-    None => PostgresConfig::new()
-  }
+  let config = PostgresConfig::new(
+    image~,
+    database~,
+    username~,
+    password~,
+    port~,
+    wait_timeout_ms~,
+  )
   let request = @testcontainers.ContainerRequest::new(config.image)
+    .with_reuse(reuse~)
     .with_port(config.port)
     .with_env("POSTGRES_USER", config.username)
     .with_env("POSTGRES_PASSWORD", config.password)

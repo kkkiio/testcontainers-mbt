@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub async fn run(config? : MySqlConfig) -> MySqlContainer raise @testcontainers.TestContainerError
+pub async fn run(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int, wait_timeout_ms? : Int, reuse? : Bool) -> MySqlContainer raise @testcontainers.TestContainerError
 
 // Errors
 
@@ -22,15 +22,9 @@ pub(all) struct MySqlConfig {
   wait_timeout_ms : Int
 } derive(Eq, @debug.Debug)
 pub fn MySqlConfig::equal(Self, Self) -> Bool
-pub fn MySqlConfig::new() -> Self
+pub fn MySqlConfig::new(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int, wait_timeout_ms? : Int) -> Self
 pub fn MySqlConfig::not_equal(Self, Self) -> Bool
 pub fn MySqlConfig::to_repr(Self) -> @debug.Repr
-pub fn MySqlConfig::with_credentials(Self, String, String) -> Self
-pub fn MySqlConfig::with_database(Self, String) -> Self
-pub fn MySqlConfig::with_image(Self, String) -> Self
-pub fn MySqlConfig::with_port(Self, Int) -> Self
-pub fn MySqlConfig::with_root_password(Self, String) -> Self
-pub fn MySqlConfig::with_wait_timeout_ms(Self, Int) -> Self
 
 pub struct MySqlContainer {
   container : @testcontainers.Container

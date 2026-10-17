@@ -147,14 +147,10 @@ pub(all) struct LogOptions {
   since : String?
   until : String?
 } derive(Eq, @debug.Debug)
-pub fn LogOptions::default() -> Self
 pub fn LogOptions::equal(Self, Self) -> Bool
+pub fn LogOptions::new(tail? : Int, timestamps? : Bool, since? : String, until? : String) -> Self
 pub fn LogOptions::not_equal(Self, Self) -> Bool
 pub fn LogOptions::to_repr(Self) -> @debug.Repr
-pub fn LogOptions::with_since(Self, String) -> Self
-pub fn LogOptions::with_tail(Self, Int) -> Self
-pub fn LogOptions::with_timestamps(Self) -> Self
-pub fn LogOptions::with_until(Self, String) -> Self
 
 pub(all) struct LogOutput {
   stdout : String

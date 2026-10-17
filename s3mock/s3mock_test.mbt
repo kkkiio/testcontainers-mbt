@@ -1,8 +1,6 @@
 ///|
 async test "s3mock serves the S3 API" {
-  let s3 = @s3mock.run(
-    config=@s3mock.S3MockConfig::new().with_initial_buckets(["test-bucket"]),
-  )
+  let s3 = @s3mock.run(initial_buckets=["test-bucket"])
   defer s3.cleanup()
   let url = s3.endpoint()
   assert_true(url.has_prefix("http://localhost:"))

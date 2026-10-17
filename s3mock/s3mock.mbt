@@ -11,7 +11,8 @@ const S3MOCK_HTTP_PORT : Int32 = 9090
 const S3MOCK_HTTPS_PORT : Int32 = 9191
 
 ///|
-/// Configuration for the S3Mock module.
+/// Configuration for the S3Mock module. All fields have sensible test
+/// defaults; pass labeled arguments to `new` to change them.
 pub(all) struct S3MockConfig {
   /// Docker image. Defaults to `adobe/s3mock:3.9.1`.
   image : String
@@ -29,36 +30,15 @@ pub extend S3MockConfig with Eq::{equal, not_equal}
 pub extend S3MockConfig with Debug::{to_repr}
 
 ///|
-/// Default configuration: `adobe/s3mock:3.9.1` without any pre-created buckets.
-pub fn S3MockConfig::new() -> S3MockConfig {
-  { image: "adobe/s3mock:3.9.1", initial_buckets: [], wait_timeout_ms: 60_000, }
-}
-
-///|
-/// Use another image tag.
-pub fn S3MockConfig::with_image(
-  self : S3MockConfig,
-  image : String,
+/// Default configuration: `adobe/s3mock:3.9.1` without any pre-created
+/// buckets. Override any field with a labeled argument, e.g.
+/// `S3MockConfig::new(initial_buckets=["assets"])`.
+pub fn S3MockConfig::new(
+  image~ : String = "adobe/s3mock:3.9.1",
+  initial_buckets~ : ArrayView[String] = [],
+  wait_timeout_ms~ : Int32 = 60_000,
 ) -> S3MockConfig {
-  { ..self, image, }
-}
-
-///|
-/// Pre-create these buckets when the container starts.
-pub fn S3MockConfig::with_initial_buckets(
-  self : S3MockConfig,
-  buckets : ArrayView[String],
-) -> S3MockConfig {
-  { ..self, initial_buckets: buckets.to_owned(), }
-}
-
-///|
-/// Set the readiness timeout in milliseconds.
-pub fn S3MockConfig::with_wait_timeout_ms(
-  self : S3MockConfig,
-  timeout_ms : Int32,
-) -> S3MockConfig {
-  { ..self, wait_timeout_ms: timeout_ms, }
+  { image, initial_buckets: initial_buckets.to_owned(), wait_timeout_ms, }
 }
 
 ///|
@@ -72,20 +52,21 @@ pub struct S3MockContainer {
 /// Start S3Mock and wait until its HTTP API answers.
 ///
 /// ```mbt nocheck
-/// let s3 = @s3mock.run(
-///   config=@s3mock.S3MockConfig::new().with_initial_buckets(["assets"]),
-/// )
+/// let s3 = @s3mock.run(initial_buckets=["assets"])
 /// defer s3.cleanup()
 /// let endpoint = s3.endpoint() // http://localhost:<random port>
 /// ```
+///
+/// `reuse` forwards to `ContainerRequest::with_reuse`.
 pub async fn run(
-  config? : S3MockConfig,
+  image~ : String = "adobe/s3mock:3.9.1",
+  initial_buckets~ : ArrayView[String] = [],
+  wait_timeout_ms~ : Int32 = 60_000,
+  reuse~ : Bool = false,
 ) -> S3MockContainer raise @testcontainers.TestContainerError {
-  let config = match config {
-    Some(config) => config
-    None => S3MockConfig::new()
-  }
+  let config = S3MockConfig::new(image~, initial_buckets~, wait_timeout_ms~)
   let mut request = @testcontainers.ContainerRequest::new(config.image)
+    .with_reuse(reuse~)
     .with_port(S3MOCK_HTTP_PORT)
     .with_port(S3MOCK_HTTPS_PORT)
   if config.initial_buckets.length() > 0 {

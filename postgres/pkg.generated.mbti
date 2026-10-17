@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub async fn run(config? : PostgresConfig) -> PostgresContainer raise @testcontainers.TestContainerError
+pub async fn run(image? : String, database? : String, username? : String, password? : String, port? : Int, wait_timeout_ms? : Int, reuse? : Bool) -> PostgresContainer raise @testcontainers.TestContainerError
 
 // Errors
 
@@ -21,14 +21,9 @@ pub(all) struct PostgresConfig {
   wait_timeout_ms : Int
 } derive(Eq, @debug.Debug)
 pub fn PostgresConfig::equal(Self, Self) -> Bool
-pub fn PostgresConfig::new() -> Self
+pub fn PostgresConfig::new(image? : String, database? : String, username? : String, password? : String, port? : Int, wait_timeout_ms? : Int) -> Self
 pub fn PostgresConfig::not_equal(Self, Self) -> Bool
 pub fn PostgresConfig::to_repr(Self) -> @debug.Repr
-pub fn PostgresConfig::with_credentials(Self, String, String) -> Self
-pub fn PostgresConfig::with_database(Self, String) -> Self
-pub fn PostgresConfig::with_image(Self, String) -> Self
-pub fn PostgresConfig::with_port(Self, Int) -> Self
-pub fn PostgresConfig::with_wait_timeout_ms(Self, Int) -> Self
 
 pub struct PostgresContainer {
   container : @testcontainers.Container
