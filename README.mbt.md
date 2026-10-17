@@ -1,5 +1,8 @@
 # Testcontainers for MoonBit
 
+[![CI](https://github.com/kkkiio/testcontainers-mbt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kkkiio/testcontainers-mbt/actions/workflows/ci.yml?query=branch%3Amain)
+[![Coverage Status](https://coveralls.io/repos/github/kkkiio/testcontainers-mbt/badge.svg?branch=main)](https://coveralls.io/github/kkkiio/testcontainers-mbt?branch=main)
+
 [Testcontainers](https://testcontainers.com/) for MoonBit — throwaway Docker
 containers for integration tests. Same services as production instead of
 mocks, fresh instance per test:
