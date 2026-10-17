@@ -179,6 +179,32 @@ async test "nginx" {
 }
 ```
 
+### Reusable containers (experimental)
+
+Starting a database container is the slow part of an integration test. A
+container marked `with_reuse` keeps running after the test — the next `moon
+test`, even in another process, re-attaches to it instead of starting a new
+one:
+
+```mbt nocheck
+///|
+async test "postgres stores rows" {
+  let request = @testcontainers.ContainerRequest::new("postgres:16-alpine")
+    .with_port(5432)
+    .with_env("POSTGRES_PASSWORD", "secret")
+    .with_reuse()
+  // ...
+}
+```
+
+Reuse is a local-development opt-in and only activates when
+`TESTCONTAINERS_REUSE_ENABLE=true` is set in the environment; otherwise the
+flag is ignored and tests behave exactly as before. The container to reuse is
+chosen by a hash of the whole configuration, so changing any `with_*` option
+starts a fresh container. `cleanup()` intentionally leaves it running — use
+`container.remove()` to delete it, and reset service state yourself between
+tests.
+
 ### S3 without AWS
 
 ```mbt nocheck
@@ -244,9 +270,15 @@ container.cleanup()             // best effort, never raises
   so arguments are never re-interpreted, but values passed with `--env` are
   briefly visible in the host process list. Error messages redact `--env`
   values.
-- **No automatic cleanup at process exit.** Use `defer`, `with_container`, or
-  your own test harness wrapper. Every container is labeled, so containers
-  leaked by a killed test process can be found and removed with
+- **Cleanup on normal exit is `defer`-based.** Use `defer`, `with_container`,
+  or your own test harness wrapper. For killed or crashed processes a
+  [Ryuk](https://github.com/testcontainers/moby-ryuk) sidecar container is
+  started automatically (as in the official implementations) and reaps the
+  session's containers shortly after the process disappears; disable it with
+  `TESTCONTAINERS_RYUK_DISABLED=true` and tune it with
+  `TESTCONTAINERS_RYUK_PRIVILEGED`, `RYUK_CONTAINER_IMAGE` and
+  `RYUK_RECONNECTION_TIMEOUT`. Reusable containers are exempt. Anything still
+  left over can be found by its label and removed with
   `ids="$(docker ps -aq --filter label=org.testcontainers.mbt=true)"; [ -z "$ids" ] || docker rm -f $ids`.
 - **Named volumes are not removed** by `cleanup()`; anonymous volumes are.
 - **Host networking is not supported**; every port is published on a random

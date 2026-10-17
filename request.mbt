@@ -160,6 +160,10 @@ pub(all) struct ContainerRequest {
   hostname : String?
   /// Image pull behaviour. Defaults to `Missing`.
   pull : PullPolicy
+  /// Keep the container alive after the test and re-attach to it on the next
+  /// run (experimental). Only honored when `TESTCONTAINERS_REUSE_ENABLE` is
+  /// set in the environment; see `with_reuse`.
+  reuse : Bool
 } derive(Debug, Eq)
 
 ///|
@@ -184,6 +188,7 @@ pub fn ContainerRequest::new(image : String) -> ContainerRequest {
     network: None,
     hostname: None,
     pull: PullPolicy::Missing,
+    reuse: false,
   }
 }
 
@@ -417,6 +422,29 @@ pub fn ContainerRequest::with_hostname(
 }
 
 ///|
+/// Mark the container as reusable (experimental).
+///
+/// A reusable container is looked up by a hash of its configuration before it
+/// is created: when a container with the same configuration already exists —
+/// running or stopped — it is re-attached instead of starting a new one. The
+/// container is **not** removed by `cleanup()` or when the test process exits;
+/// call `Container::remove` explicitly to delete it.
+///
+/// Reuse only takes effect when `TESTCONTAINERS_REUSE_ENABLE=true` is set in
+/// the environment. Without it the flag is ignored, matching the other
+/// testcontainers implementations that treat reuse as a local-development
+/// opt-in which must not leak into CI.
+///
+/// Caveat: a reused container keeps all of its state (rows, topics, keys).
+/// Tests that depend on a clean service must reset that state themselves.
+pub fn ContainerRequest::with_reuse(
+  self : ContainerRequest,
+  reuse~ : Bool = true,
+) -> ContainerRequest {
+  { ..self, reuse, }
+}
+
+///|
 /// Choose when the image is pulled.
 pub fn ContainerRequest::with_pull_policy(
   self : ContainerRequest,
@@ -498,6 +526,12 @@ fn validate_request(
     raise InvalidRequest(
       "auto_remove cannot be combined with a wait strategy that inspects the " +
       "container after it exits (Exit); docker deletes the container on exit",
+    )
+  }
+  if request.reuse && request.auto_remove {
+    raise InvalidRequest(
+      "reuse cannot be combined with auto_remove; docker deletes the " +
+      "container on exit so there would be nothing to reuse",
     )
   }
   for port in request.ports {

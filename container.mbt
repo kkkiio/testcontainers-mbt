@@ -17,6 +17,9 @@ pub struct Container {
   request : ContainerRequest
   ports : Array[(Int32, Int32)]
   host : String
+  /// Started under reuse mode: `cleanup` leaves it running on purpose and
+  /// `remove` is needed to delete it.
+  reusable : Bool
 }
 
 ///|
@@ -51,6 +54,15 @@ pub async fn ContainerRequest::start(
   self : ContainerRequest,
 ) -> Container raise TestContainerError {
   validate_request(self)
+  if self.reuse {
+    if reuse_enabled() {
+      return self.start_reusable()
+    }
+    warn_reuse_disabled()
+  }
+  // Register this process with the resource reaper before the container is
+  // created, so a killed test process cannot leak it.
+  ensure_reaper()
   self.ensure_image()
   let args = self.run_args()
   let output = docker_command(args)
@@ -67,6 +79,7 @@ pub async fn ContainerRequest::start(
     request: self,
     ports: [],
     host: docker_host(),
+    reusable: false,
   }
   // From here on the container exists. Clean it up if port resolution or the
   // wait strategy fails, or if the surrounding test is cancelled. `cleanup`
@@ -192,6 +205,11 @@ pub async fn Container::remove(
 /// block. Failure to clean up must not turn a passing test into a failing one,
 /// so problems are reported on stdout as a warning instead of being raised.
 pub async fn Container::cleanup(self : Container) -> Unit noraise {
+  if self.reusable {
+    // Reusable containers outlive the test on purpose; `remove` deletes
+    // them explicitly.
+    return
+  }
   let result : Result[Unit, TestContainerError] = Ok(self.remove()) catch {
     e => Err(e)
   }
@@ -403,7 +421,19 @@ fn ContainerRequest::run_args(self : ContainerRequest) -> Array[String] {
   // Label every container so leaked ones from a killed test process can be
   // found: docker ps -aq --filter label=org.testcontainers.mbt=true
   args.push("--label")
-  args.push("org.testcontainers.mbt=true")
+  args.push("\{LABEL_MANAGED}=true")
+  // The session label is what the resource reaper keys on. Reusable
+  // containers must not carry it, or ryuk would delete them between test
+  // runs.
+  if !self.reuse {
+    match current_session_id() {
+      Some(session_id) => {
+        args.push("--label")
+        args.push("\{LABEL_SESSION}=\{session_id}")
+      }
+      None => ()
+    }
+  }
   for pair in self.labels {
     let (key, value) = pair
     args.push("--label")

@@ -59,6 +59,7 @@ pub struct Container {
   request : ContainerRequest
   ports : Array[(Int, Int)]
   host : String
+  reusable : Bool
 }
 pub async fn Container::cleanup(Self) -> Unit noraise
 pub async fn Container::copy_from(Self, String, String) -> Unit raise TestContainerError
@@ -98,6 +99,7 @@ pub(all) struct ContainerRequest {
   network : String?
   hostname : String?
   pull : PullPolicy
+  reuse : Bool
 } derive(Eq, @debug.Debug)
 pub fn ContainerRequest::equal(Self, Self) -> Bool
 pub fn ContainerRequest::image_name(Self) -> String
@@ -122,6 +124,7 @@ pub fn ContainerRequest::with_network(Self, String) -> Self
 pub fn ContainerRequest::with_port(Self, Int) -> Self
 pub fn ContainerRequest::with_ports(Self, ArrayView[Int]) -> Self
 pub fn ContainerRequest::with_pull_policy(Self, PullPolicy) -> Self
+pub fn ContainerRequest::with_reuse(Self, reuse? : Bool) -> Self
 pub fn ContainerRequest::with_tmpfs(Self, String) -> Self
 pub fn ContainerRequest::with_user(Self, String) -> Self
 pub fn ContainerRequest::with_volume(Self, String, String) -> Self

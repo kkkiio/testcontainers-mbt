@@ -6,6 +6,7 @@ import {
   "moonbitlang/async/socket",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "moonbitlang/core/random",
 }
 
 // Containers are started by spawning the `docker` CLI, so this package only
