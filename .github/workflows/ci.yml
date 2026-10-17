@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Show versions
+        run: |
+          moon version --all
+          docker version
+      - name: Resolve dependencies
+        run: moon update
+      - name: moon check
+        run: moon check --target native
+      - name: moon fmt --check
+        run: moon fmt --check
+
+  test:
+    name: Integration tests (native)
+    runs-on: ubuntu-latest
+    # Tests pull postgres, mysql and s3mock images on a cold cache.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Show versions
+        run: |
+          moon version --all
+          docker version
+      - name: Resolve dependencies
+        run: moon update
+      - name: Pull test images in parallel
+        run: |
+          set -e
+          pids=()
+          for image in postgres:16-alpine mysql:8.4 adobe/s3mock:3.9.1 hashicorp/http-echo:1.0 alpine:3.21; do
+            docker pull "$image" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
+      # Sequential execution keeps container churn low on small runners and is
+      # as fast as the parallel run once images are cached.
+      - name: moon test
+        run: moon test --target native --no-parallelize
+      - name: Remove leaked containers
+        if: always()
+        run: |
+          ids="$(docker ps -aq --filter label=org.testcontainers.mbt=true)"
+          if [ -n "$ids" ]; then
+            docker rm -f $ids
+          fi

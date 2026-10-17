@@ -1,0 +1,8 @@
+testcontainers for MoonBit
+Copyright 2026 xziheng
+
+This product includes software developed at
+ryota0624/moonbit_test_containers (https://github.com/ryota0624/moonbit_test_containers),
+licensed under the Apache License, Version 2.0.
+The original source was used as the starting point and has been substantially
+modified for the current MoonBit toolchain.

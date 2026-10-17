@@ -1,0 +1,10 @@
+import {
+  "xziheng/testcontainers",
+}
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/http",
+} for "test"
+
+supported_targets = "native"

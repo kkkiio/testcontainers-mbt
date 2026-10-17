@@ -1,0 +1,208 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "xziheng/testcontainers"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn command_error_text(CommandOutput) -> String
+
+pub async fn docker(ArrayView[String]) -> String raise TestContainerError
+
+pub async fn docker_command(ArrayView[String]) -> CommandOutput raise TestContainerError
+
+pub async fn image_exists(String) -> Bool raise TestContainerError
+
+pub async fn inspect_container(String) -> Json raise TestContainerError
+
+pub fn join_host_port(String, Int) -> String
+
+pub async fn pull_image(String) -> Unit raise TestContainerError
+
+pub fn render_command(String, ArrayView[String]) -> String
+
+pub async fn run(ContainerRequest) -> Container raise TestContainerError
+
+pub fn short_id(String) -> String
+
+pub fn split_image_ref(String) -> (String, String)
+
+pub async fn[T] with_container(ContainerRequest, async (Container) -> T) -> T
+
+// Errors
+pub(all) suberror TestContainerError {
+  DockerNotAvailable(String)
+  DockerCommandFailed(command~ : String, code~ : Int, stderr~ : String)
+  ImagePullFailed(image~ : String, stderr~ : String)
+  WaitTimeout(strategy~ : String, timeout_ms~ : Int, logs~ : String)
+  PortNotMapped(container_port~ : Int, container_id~ : String)
+  InvalidRequest(String)
+  ContainerNotRunning(container_id~ : String, status~ : String)
+  UnexpectedOutput(String)
+  IoFailed(String)
+} derive(@debug.Debug)
+pub fn TestContainerError::output(Self, &Logger) -> Unit
+pub fn TestContainerError::to_repr(Self) -> @debug.Repr
+pub fn TestContainerError::to_string(Self) -> String
+pub impl Show for TestContainerError
+
+// Types and methods
+pub(all) struct CommandOutput {
+  code : Int
+  stdout : String
+  stderr : String
+}
+
+pub struct Container {
+  id : String
+  request : ContainerRequest
+  ports : Array[(Int, Int)]
+  host : String
+}
+pub async fn Container::cleanup(Self) -> Unit noraise
+pub fn Container::endpoint(Self, Int) -> String raise TestContainerError
+pub async fn Container::exec(Self, ArrayView[String]) -> ExecOutput raise TestContainerError
+pub async fn Container::exec_checked(Self, ArrayView[String]) -> String raise TestContainerError
+pub async fn Container::exists(Self) -> Bool noraise
+pub fn Container::host(Self) -> String
+pub fn Container::host_port(Self, Int) -> Int raise TestContainerError
+pub fn Container::host_port_opt(Self, Int) -> Int?
+pub fn Container::id(Self) -> String
+pub async fn Container::is_running(Self) -> Bool raise TestContainerError
+pub async fn Container::logs(Self, options? : LogOptions) -> String raise TestContainerError
+pub async fn Container::logs_split(Self, options? : LogOptions) -> LogOutput raise TestContainerError
+pub async fn Container::remove(Self) -> Unit raise TestContainerError
+pub fn Container::request(Self) -> ContainerRequest
+pub async fn Container::status(Self) -> String raise TestContainerError
+pub async fn Container::stop(Self, timeout_seconds? : Int) -> Unit raise TestContainerError
+pub async fn Container::stream_logs(Self, (String) -> Unit raise) -> Unit
+pub async fn Container::wait_for(Self, WaitStrategy, timeout_ms? : Int) -> Unit raise TestContainerError
+pub async fn Container::wait_ready(Self) -> Unit raise TestContainerError
+
+pub(all) struct ContainerRequest {
+  image : String
+  ports : Array[Int]
+  env : Array[(String, String)]
+  cmd : Array[String]
+  entrypoint : Array[String]
+  mounts : Array[Mount]
+  labels : Array[(String, String)]
+  wait : WaitStrategy
+  wait_timeout_ms : Int
+  auto_remove : Bool
+  name : String?
+  user : String?
+  network : String?
+  hostname : String?
+  pull : PullPolicy
+} derive(Eq, @debug.Debug)
+pub fn ContainerRequest::equal(Self, Self) -> Bool
+pub fn ContainerRequest::image_name(Self) -> String
+pub fn ContainerRequest::image_tag(Self) -> String
+pub fn ContainerRequest::new(String) -> Self
+pub fn ContainerRequest::not_equal(Self, Self) -> Bool
+pub async fn ContainerRequest::start(Self) -> Container raise TestContainerError
+pub fn ContainerRequest::to_repr(Self) -> @debug.Repr
+pub fn ContainerRequest::with_auto_remove(Self, Bool) -> Self
+pub fn ContainerRequest::with_bind(Self, String, String) -> Self
+pub fn ContainerRequest::with_bind_read_only(Self, String, String) -> Self
+pub fn ContainerRequest::with_cmd(Self, ArrayView[String]) -> Self
+pub fn ContainerRequest::with_entrypoint(Self, ArrayView[String]) -> Self
+pub fn ContainerRequest::with_env(Self, String, String) -> Self
+pub fn ContainerRequest::with_envs(Self, ArrayView[(String, String)]) -> Self
+pub fn ContainerRequest::with_hostname(Self, String) -> Self
+pub fn ContainerRequest::with_image(Self, String) -> Self
+pub fn ContainerRequest::with_label(Self, String, String) -> Self
+pub fn ContainerRequest::with_mount(Self, Mount) -> Self
+pub fn ContainerRequest::with_name(Self, String) -> Self
+pub fn ContainerRequest::with_network(Self, String) -> Self
+pub fn ContainerRequest::with_port(Self, Int) -> Self
+pub fn ContainerRequest::with_ports(Self, ArrayView[Int]) -> Self
+pub fn ContainerRequest::with_pull_policy(Self, PullPolicy) -> Self
+pub fn ContainerRequest::with_tmpfs(Self, String) -> Self
+pub fn ContainerRequest::with_user(Self, String) -> Self
+pub fn ContainerRequest::with_volume(Self, String, String) -> Self
+pub fn ContainerRequest::with_wait_for(Self, WaitStrategy) -> Self
+pub fn ContainerRequest::with_wait_timeout(Self, Int) -> Self
+pub fn ContainerRequest::with_wait_timeout_ms(Self, Int) -> Self
+
+pub(all) struct ExecOutput {
+  code : Int
+  stdout : String
+  stderr : String
+} derive(Eq, @debug.Debug)
+pub fn ExecOutput::equal(Self, Self) -> Bool
+pub fn ExecOutput::not_equal(Self, Self) -> Bool
+pub fn ExecOutput::to_repr(Self) -> @debug.Repr
+
+pub(all) struct LogOptions {
+  tail : Int?
+  timestamps : Bool
+  since : String?
+  until : String?
+} derive(Eq, @debug.Debug)
+pub fn LogOptions::default() -> Self
+pub fn LogOptions::equal(Self, Self) -> Bool
+pub fn LogOptions::not_equal(Self, Self) -> Bool
+pub fn LogOptions::to_repr(Self) -> @debug.Repr
+pub fn LogOptions::with_since(Self, String) -> Self
+pub fn LogOptions::with_tail(Self, Int) -> Self
+pub fn LogOptions::with_timestamps(Self) -> Self
+pub fn LogOptions::with_until(Self, String) -> Self
+
+pub(all) struct LogOutput {
+  stdout : String
+  stderr : String
+} derive(Eq, @debug.Debug)
+pub fn LogOutput::equal(Self, Self) -> Bool
+pub fn LogOutput::not_equal(Self, Self) -> Bool
+pub fn LogOutput::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Mount {
+  source : MountSource
+  target : String
+  read_only : Bool
+} derive(Eq, @debug.Debug)
+pub fn Mount::equal(Self, Self) -> Bool
+pub fn Mount::not_equal(Self, Self) -> Bool
+pub fn Mount::to_repr(Self) -> @debug.Repr
+
+pub(all) enum MountSource {
+  Bind(String)
+  Volume(String)
+  Tmpfs
+} derive(Eq, @debug.Debug)
+pub fn MountSource::equal(Self, Self) -> Bool
+pub fn MountSource::not_equal(Self, Self) -> Bool
+pub fn MountSource::to_repr(Self) -> @debug.Repr
+
+pub(all) enum PullPolicy {
+  Missing
+  Always
+  Never
+} derive(Eq, @debug.Debug)
+pub fn PullPolicy::equal(Self, Self) -> Bool
+pub fn PullPolicy::not_equal(Self, Self) -> Bool
+pub fn PullPolicy::to_repr(Self) -> @debug.Repr
+
+pub(all) enum WaitStrategy {
+  NoWait
+  Seconds(Int)
+  TcpPort(Int)
+  HttpGet(Int, String, Int)
+  LogMessage(String)
+  Exec(Array[String])
+  Healthy
+  Exit(Int)
+  All(Array[WaitStrategy])
+  Any(Array[WaitStrategy])
+} derive(Eq, @debug.Debug)
+pub fn WaitStrategy::describe(Self) -> String
+pub fn WaitStrategy::equal(Self, Self) -> Bool
+pub fn WaitStrategy::not_equal(Self, Self) -> Bool
+pub fn WaitStrategy::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

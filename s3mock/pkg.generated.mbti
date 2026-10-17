@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "xziheng/testcontainers/s3mock"
+
+import {
+  "moonbitlang/core/debug",
+  "xziheng/testcontainers",
+}
+
+// Values
+pub async fn run(config? : S3MockConfig) -> S3MockContainer raise @testcontainers.TestContainerError
+
+// Errors
+
+// Types and methods
+pub(all) struct S3MockConfig {
+  image : String
+  initial_buckets : Array[String]
+  wait_timeout_ms : Int
+} derive(Eq, @debug.Debug)
+pub fn S3MockConfig::equal(Self, Self) -> Bool
+pub fn S3MockConfig::new() -> Self
+pub fn S3MockConfig::not_equal(Self, Self) -> Bool
+pub fn S3MockConfig::to_repr(Self) -> @debug.Repr
+pub fn S3MockConfig::with_image(Self, String) -> Self
+pub fn S3MockConfig::with_initial_buckets(Self, ArrayView[String]) -> Self
+pub fn S3MockConfig::with_wait_timeout_ms(Self, Int) -> Self
+
+pub struct S3MockContainer {
+  container : @testcontainers.Container
+  config : S3MockConfig
+}
+pub fn S3MockContainer::access_key(Self) -> String
+pub async fn S3MockContainer::cleanup(Self) -> Unit
+pub fn S3MockContainer::container(Self) -> @testcontainers.Container
+pub fn S3MockContainer::endpoint(Self) -> String raise @testcontainers.TestContainerError
+pub fn S3MockContainer::https_endpoint(Self) -> String raise @testcontainers.TestContainerError
+pub fn S3MockContainer::initial_buckets(Self) -> Array[String]
+pub fn S3MockContainer::region(Self) -> String
+pub fn S3MockContainer::secret_key(Self) -> String
+pub async fn S3MockContainer::stop(Self) -> Unit raise @testcontainers.TestContainerError
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,214 @@
+///|
+/// Configuration for the Postgres module. All fields have sensible test
+/// defaults; use the `with_*` methods to change one of them.
+pub(all) struct PostgresConfig {
+  /// Docker image. Defaults to `postgres:16-alpine`.
+  image : String
+  /// Database created on first start (`POSTGRES_DB`).
+  database : String
+  /// Superuser name (`POSTGRES_USER`).
+  username : String
+  /// Superuser password (`POSTGRES_PASSWORD`).
+  password : String
+  /// Container port. Published on a random host port.
+  port : Int32
+  /// Readiness timeout in milliseconds.
+  wait_timeout_ms : Int32
+} derive(Debug, Eq)
+
+///|
+pub extend PostgresConfig with Eq::{equal, not_equal}
+
+///|
+pub extend PostgresConfig with Debug::{to_repr}
+
+///|
+/// Default configuration: `postgres:16-alpine` with user, password and database
+/// all set to `postgres`, like the other testcontainers implementations.
+pub fn PostgresConfig::new() -> PostgresConfig {
+  {
+    image: "postgres:16-alpine",
+    database: "postgres",
+    username: "postgres",
+    password: "postgres",
+    port: 5432,
+    wait_timeout_ms: 60_000,
+  }
+}
+
+///|
+/// Use another image, e.g. `postgres:15-alpine` or a PostGIS image.
+pub fn PostgresConfig::with_image(
+  self : PostgresConfig,
+  image : String,
+) -> PostgresConfig {
+  { ..self, image, }
+}
+
+///|
+/// Set database name and credentials.
+pub fn PostgresConfig::with_credentials(
+  self : PostgresConfig,
+  username : String,
+  password : String,
+) -> PostgresConfig {
+  { ..self, username, password, }
+}
+
+///|
+/// Set the database name.
+pub fn PostgresConfig::with_database(
+  self : PostgresConfig,
+  database : String,
+) -> PostgresConfig {
+  { ..self, database, }
+}
+
+///|
+/// Use a different container port. Rarely needed.
+pub fn PostgresConfig::with_port(
+  self : PostgresConfig,
+  port : Int32,
+) -> PostgresConfig {
+  { ..self, port, }
+}
+
+///|
+/// Set the readiness timeout in milliseconds.
+pub fn PostgresConfig::with_wait_timeout_ms(
+  self : PostgresConfig,
+  timeout_ms : Int32,
+) -> PostgresConfig {
+  { ..self, wait_timeout_ms: timeout_ms, }
+}
+
+///|
+/// A running Postgres container.
+pub struct PostgresContainer {
+  container : @testcontainers.Container
+  config : PostgresConfig
+}
+
+///|
+/// Start Postgres and wait until it accepts connections.
+///
+/// ```mbt nocheck
+/// let pg = @postgres.run()
+/// defer pg.cleanup()
+/// let dsn = pg.connection_string(ssl_mode="disable")
+/// ```
+pub async fn run(
+  config? : PostgresConfig,
+) -> PostgresContainer raise @testcontainers.TestContainerError {
+  let config = match config {
+    Some(config) => config
+    None => PostgresConfig::new()
+  }
+  let request = @testcontainers.ContainerRequest::new(config.image)
+    .with_port(config.port)
+    .with_env("POSTGRES_USER", config.username)
+    .with_env("POSTGRES_PASSWORD", config.password)
+    .with_env("POSTGRES_DB", config.database)
+    // fsync=off is what testcontainers-go does too: throwaway test data does
+    // not need to survive a crash, and it makes initdb noticeably faster.
+    .with_cmd(["postgres", "-c", "fsync=off"])
+    .with_wait_for(
+      @testcontainers.WaitStrategy::All([
+        // pg_isready with -h 127.0.0.1 forces a TCP connection. Without -h it
+        // would talk to the Unix socket of initdb's temporary server and
+        // report ready while the real server is still starting.
+        @testcontainers.WaitStrategy::Exec([
+          "pg_isready",
+          "-h",
+          "127.0.0.1",
+          "-U",
+          config.username,
+          "-d",
+          config.database,
+        ]),
+        @testcontainers.WaitStrategy::TcpPort(config.port),
+      ]),
+    )
+    .with_wait_timeout_ms(config.wait_timeout_ms)
+  let container = request.start()
+  { container, config, }
+}
+
+///|
+/// The underlying generic container, for exec, logs and so on.
+pub fn PostgresContainer::container(
+  self : PostgresContainer,
+) -> @testcontainers.Container {
+  self.container
+}
+
+///|
+/// Host that reaches the published Postgres port.
+pub fn PostgresContainer::host(self : PostgresContainer) -> String {
+  self.container.host()
+}
+
+///|
+/// Host port the container's 5432 is published on.
+pub fn PostgresContainer::port(
+  self : PostgresContainer,
+) -> Int32 raise @testcontainers.TestContainerError {
+  self.container.host_port(self.config.port)
+}
+
+///|
+/// Database name.
+pub fn PostgresContainer::database(self : PostgresContainer) -> String {
+  self.config.database
+}
+
+///|
+/// User name.
+pub fn PostgresContainer::username(self : PostgresContainer) -> String {
+  self.config.username
+}
+
+///|
+/// Password.
+pub fn PostgresContainer::password(self : PostgresContainer) -> String {
+  self.config.password
+}
+
+///|
+/// `postgres://user:password@host:port/database`, optionally with
+/// `?sslmode=<mode>`.
+///
+/// Pass `ssl_mode="disable"` for plain local test containers; the default adds
+/// no query parameter at all.
+pub fn PostgresContainer::connection_string(
+  self : PostgresContainer,
+  ssl_mode? : String,
+) -> String raise @testcontainers.TestContainerError {
+  let port = self.port()
+  let base = "postgres://" +
+    @percent.encode(self.config.username) +
+    ":" +
+    @percent.encode(self.config.password) +
+    "@" +
+    @testcontainers.join_host_port(self.container.host(), port) +
+    "/" +
+    @percent.encode(self.config.database)
+  match ssl_mode {
+    Some(mode) => base + "?sslmode=" + @percent.encode(mode)
+    None => base
+  }
+}
+
+///|
+/// Stop the container.
+pub async fn PostgresContainer::stop(
+  self : PostgresContainer,
+) -> Unit raise @testcontainers.TestContainerError {
+  self.container.stop()
+}
+
+///|
+/// Force-remove the container. Never raises, safe for `defer`.
+pub async fn PostgresContainer::cleanup(self : PostgresContainer) -> Unit {
+  self.container.cleanup()
+}
