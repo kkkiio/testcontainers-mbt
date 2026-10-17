@@ -61,6 +61,8 @@ pub struct Container {
   host : String
 }
 pub async fn Container::cleanup(Self) -> Unit noraise
+pub async fn Container::copy_from(Self, String, String) -> Unit raise TestContainerError
+pub async fn Container::copy_to(Self, String, String) -> Unit raise TestContainerError
 pub fn Container::endpoint(Self, Int) -> String raise TestContainerError
 pub async fn Container::exec(Self, ArrayView[String]) -> ExecOutput raise TestContainerError
 pub async fn Container::exec_checked(Self, ArrayView[String]) -> String raise TestContainerError

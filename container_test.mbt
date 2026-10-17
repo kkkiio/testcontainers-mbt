@@ -10,7 +10,7 @@ async test "run to completion and read logs" {
     .start()
   defer container.cleanup()
   let logs = container.logs()
-  assert_true(logs.contains("hello from the container"))
+  assert_eq(logs.trim().to_owned(), "hello from the container")
   assert_false(container.is_running())
 }
 
@@ -25,7 +25,7 @@ async test "environment variables reach the container" {
     .start()
   defer container.cleanup()
   let logs = container.logs()
-  assert_true(logs.contains("hi there|unset"))
+  assert_eq(logs.trim().to_owned(), "hi there|unset")
 }
 
 ///|
@@ -78,7 +78,7 @@ async test "log message wait strategy" {
     .with_wait_timeout(60)
     .start()
   defer container.cleanup()
-  assert_true(container.logs().contains("READY-MARKER"))
+  assert_eq(container.logs().trim().to_owned(), "READY-MARKER")
 }
 
 ///|
@@ -109,7 +109,7 @@ async test "bind mounts expose host files" {
     .with_wait_timeout(120)
     .start()
   defer container.cleanup()
-  assert_true(container.logs().contains("mounted"))
+  assert_eq(container.logs().trim().to_owned(), "mounted")
   @fs.rmdir(dir, recursive=true)
 }
 
@@ -131,11 +131,16 @@ async test "timeout errors carry the logs and remove the container" {
       container.cleanup()
       fail("expected the wait strategy to time out")
     }
-    Err(error) => {
-      let message = error.to_string()
-      assert_true(message.contains("did not become ready"))
-      assert_true(message.contains("booting"))
-    }
+    Err(error) =>
+      match error {
+        WaitTimeout(strategy~, timeout_ms~, logs~) => {
+          assert_eq(strategy, "TCP port 9999")
+          assert_eq(timeout_ms, 1_500)
+          // The container's own output is included in the error.
+          assert_eq(logs, "booting")
+        }
+        _ => fail("expected WaitTimeout, got \{error.to_string()}")
+      }
   }
   // A failed start must not leak the half-started container.
   let leftovers = @testcontainers.docker([
@@ -151,6 +156,7 @@ async test "timeout errors carry the logs and remove the container" {
 ///|
 async test "a dead container fails fast instead of timing out" {
   let request = @testcontainers.ContainerRequest::new("alpine:3.21")
+    .with_port(1234)
     .with_cmd(["sh", "-c", "echo crashing; exit 7"])
     .with_wait_for(@testcontainers.WaitStrategy::TcpPort(1234))
     .with_wait_timeout_ms(30_000)
@@ -163,7 +169,13 @@ async test "a dead container fails fast instead of timing out" {
       container.cleanup()
       fail("expected the wait to fail")
     }
-    Err(error) => assert_true(error.to_string().contains("is not running"))
+    Err(error) =>
+      match error {
+        // The published port must not be reported ready just because docker's
+        // userland proxy accepts the host connection.
+        ContainerNotRunning(status~, ..) => assert_eq(status, "exited")
+        _ => fail("expected ContainerNotRunning, got \{error.to_string()}")
+      }
   }
 }
 
@@ -236,7 +248,11 @@ async test "pulling a missing image fails with a useful error" {
       fail("expected the image pull to fail")
     }
     Err(error) =>
-      assert_true(error.to_string().contains("failed to pull image"))
+      match error {
+        ImagePullFailed(image~, ..) =>
+          assert_eq(image, "testcontainers-mbt-does-not-exist:nope")
+        _ => fail("expected ImagePullFailed, got \{error.to_string()}")
+      }
   }
 }
 
@@ -262,8 +278,7 @@ async test "log options: tail and timestamps" {
   let tailed = container.logs(
     options=@testcontainers.LogOptions::default().with_tail(2),
   )
-  assert_true(tailed.contains("line-5"))
-  assert_false(tailed.contains("line-1"))
+  assert_eq(tailed.trim().to_owned(), "line-4\nline-5")
   let stamped = container.logs(
     options=@testcontainers.LogOptions::default().with_timestamps(),
   )
@@ -279,7 +294,7 @@ async test "wait_for can wait again after start" {
     .start()
   defer container.cleanup()
   container.wait_for(@testcontainers.WaitStrategy::LogMessage("LATE-READY"))
-  assert_true(container.logs().contains("LATE-READY"))
+  assert_eq(container.logs().trim().to_owned(), "LATE-READY")
 }
 
 ///|
@@ -327,7 +342,14 @@ async test "pull policy never fails when the image is missing" {
       fail("expected docker run to fail for a missing image")
     }
     Err(error) =>
-      assert_true(error.to_string().contains("docker command failed"))
+      match error {
+        // No pull is attempted: docker itself reports the missing image.
+        DockerCommandFailed(code~, stderr~, ..) => {
+          assert_eq(code, 125)
+          assert_true(stderr.contains("No such image"))
+        }
+        _ => fail("expected DockerCommandFailed, got \{error.to_string()}")
+      }
   }
 }
 
@@ -346,7 +368,14 @@ async test "healthy strategy rejects images without a health check" {
       container.cleanup()
       fail("expected the health check wait to fail")
     }
-    Err(error) => assert_true(error.to_string().contains("no HEALTHCHECK"))
+    Err(error) =>
+      match error {
+        ContainerNotRunning(status~, ..) =>
+          assert_eq(
+            status, "the image has no HEALTHCHECK; use another WaitStrategy or add a HEALTHCHECK to the image",
+          )
+        _ => fail("expected ContainerNotRunning, got \{error.to_string()}")
+      }
   }
 }
 
@@ -416,7 +445,13 @@ async test "a hanging exec probe cannot exceed the wait timeout" {
       fail("expected the exec wait to time out")
     }
     Err(error) =>
-      assert_true(error.to_string().contains("did not become ready"))
+      match error {
+        WaitTimeout(strategy~, timeout_ms~, ..) => {
+          assert_eq(strategy, "exec `sh -c sleep 600`")
+          assert_eq(timeout_ms, 1_500)
+        }
+        _ => fail("expected WaitTimeout, got \{error.to_string()}")
+      }
   }
   // The probe is cancelled at the deadline; allow generous slack for cleanup.
   assert_true(elapsed < 10_000)
@@ -438,7 +473,14 @@ async test "wait_for reports the effective timeout" {
   }
   match result {
     Ok(_) => fail("expected the wait to time out")
-    Err(error) => assert_true(error.to_string().contains("within 500 ms"))
+    Err(error) =>
+      match error {
+        WaitTimeout(timeout_ms~, logs~, ..) => {
+          assert_eq(timeout_ms, 500)
+          assert_eq(logs, "")
+        }
+        _ => fail("expected WaitTimeout, got \{error.to_string()}")
+      }
   }
 }
 

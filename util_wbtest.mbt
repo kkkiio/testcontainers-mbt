@@ -69,14 +69,28 @@ test "parse_port_number rejects out of range values" {
 }
 
 ///|
-test "describe is human readable" {
-  assert_eq(WaitStrategy::TcpPort(5432).describe(), "TCP port 5432")
-  assert_eq(
-    WaitStrategy::All([
-      WaitStrategy::TcpPort(1),
-      WaitStrategy::LogMessage("ready"),
-    ]).describe(),
-    "all of [TCP port 1, log message `ready`]",
+test "describe covers every wait strategy" {
+  // These strings are what WaitTimeout errors show to the user, so the whole
+  // vocabulary belongs in one reviewable snapshot.
+  inspect(
+    [
+      WaitStrategy::NoWait.describe(),
+      WaitStrategy::Seconds(5).describe(),
+      WaitStrategy::TcpPort(5432).describe(),
+      WaitStrategy::HttpGet(8080, "/health", 200).describe(),
+      WaitStrategy::LogMessage("ready").describe(),
+      WaitStrategy::Exec(["pg_isready", "-h", "127.0.0.1"]).describe(),
+      WaitStrategy::Healthy.describe(),
+      WaitStrategy::Exit(0).describe(),
+      WaitStrategy::All([
+        WaitStrategy::TcpPort(1),
+        WaitStrategy::LogMessage("ready"),
+      ]).describe(),
+      WaitStrategy::Any([WaitStrategy::TcpPort(1), WaitStrategy::Exit(3)]).describe(),
+    ],
+    content=(
+      #|[no wait, sleep 5s, TCP port 5432, HTTP GET on port 8080 /health returning 200, log message `ready`, exec `pg_isready -h 127.0.0.1`, docker health check, container exit code 0, all of [TCP port 1, log message `ready`], any of [TCP port 1, container exit code 3]]
+    ),
   )
 }
 
@@ -119,30 +133,49 @@ test "auto_remove cannot be combined with an exit wait" {
 }
 
 ///|
-test "run args use per-port publishing, not --publish-all" {
+test "run args" {
+  // The complete argv is the review artifact: it shows the per-port
+  // `--publish 5432` (no --publish-all / EXPOSE requirement), the management
+  // label, env values and where the command starts.
   let request = ContainerRequest::new("postgres:16-alpine")
     .with_port(5432)
     .with_env("POSTGRES_PASSWORD", "a b")
     .with_label("suite", "db")
     .with_cmd(["postgres", "-c", "fsync=off"])
-  let args = request.run_args()
-  assert_false(args.contains("-P"))
-  assert_false(args.contains("--publish-all"))
-  // -p 5432 without a host port: docker picks a free port, no EXPOSE needed.
-  assert_true(args.contains("--publish"))
-  let joined = args.join(" ")
-  assert_true(joined.contains("POSTGRES_PASSWORD=a b"))
-  assert_true(joined.has_suffix("postgres:16-alpine postgres -c fsync=off"))
+  inspect(
+    "docker " + request.run_args().join(" "),
+    content=(
+      #|docker run --detach --env POSTGRES_PASSWORD=a b --label org.testcontainers.mbt=true --label suite=db --publish 5432 postgres:16-alpine postgres -c fsync=off
+    ),
+  )
 }
 
 ///|
-test "entrypoint becomes --entrypoint plus leading command args" {
+test "run args: entrypoint becomes --entrypoint plus leading command args" {
   let request = ContainerRequest::new("alpine")
     .with_entrypoint(["/bin/sh", "-c"])
     .with_cmd(["echo hi"])
-  let args = request.run_args()
-  let joined = args.join(" ")
-  assert_true(joined.contains("--entrypoint /bin/sh alpine -c echo hi"))
+  inspect(
+    "docker " + request.run_args().join(" "),
+    content=(
+      #|docker run --detach --label org.testcontainers.mbt=true --entrypoint /bin/sh alpine -c echo hi
+    ),
+  )
+}
+
+///|
+test "run args: pull policy never is enforced by the daemon" {
+  // Only `Never` needs a daemon flag: `Missing` is docker's default and
+  // `Always` is an explicit pull in `ensure_image`.
+  let base = ContainerRequest::new("alpine:3.21")
+  inspect(
+    [PullPolicy::Missing, PullPolicy::Always, PullPolicy::Never].map(policy => {
+      "docker " + base.with_pull_policy(policy).run_args().join(" ")
+    }),
+    content=(
+      #|[docker run --detach --label org.testcontainers.mbt=true alpine:3.21, docker run --detach --label org.testcontainers.mbt=true alpine:3.21, docker run --detach --pull never --label org.testcontainers.mbt=true alpine:3.21]
+    ),
+  )
 }
 
 ///|
@@ -151,11 +184,13 @@ test "parse_listening_ports finds listeners only" {
     "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0\n" +
     "   1: 0100007F:1538 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12346 1 0000000000000000 100 0 0 10 0\n" +
     "   2: 0100007F:9C40 0100007F:1F90 01 00000000:00000000 00:00000000 00000000     0        0 12347 1 0000000000000000 100 0 0 10 0\n"
-  let ports = parse_listening_ports(sample)
-  assert_true(ports.contains(8080))
-  assert_true(ports.contains(5432))
-  // ESTABLISHED (01) is not a listening port.
-  assert_false(ports.contains(40000))
+  // Only LISTEN (0A) entries are returned; 40000 is ESTABLISHED (01).
+  inspect(
+    parse_listening_ports(sample),
+    content=(
+      #|[8080, 5432]
+    ),
+  )
 }
 
 ///|

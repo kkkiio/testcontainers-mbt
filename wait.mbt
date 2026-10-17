@@ -193,27 +193,52 @@ async fn Container::probe(
 }
 
 ///|
+/// Outcome of the in-container listening check.
+priv enum ListeningState {
+  Listening
+  NotListening
+  /// The image has no usable procfs/`cat`, so the caller must probe the host
+  /// port instead.
+  Unknown
+  /// The container is no longer running; waiting can never succeed.
+  Dead(String)
+}
+
+///|
 /// Is `container_port` in LISTEN state inside the container?
 ///
 /// A plain TCP connect from the host is not a reliable readiness signal: when
 /// docker uses its userland proxy, connections to a published port are accepted
 /// even when nothing inside the container listens on it. Reading `/proc/net/tcp`
 /// inside the container avoids that false positive.
-///
-/// Returns `None` when the check cannot be performed (no shell tools or no
-/// procfs in the image), in which case the caller falls back to a TCP connect.
 async fn Container::listening_inside(
   self : Container,
   container_port : Int32,
-) -> Bool? {
+) -> ListeningState {
   let output = self.exec(["cat", "/proc/net/tcp", "/proc/net/tcp6"])
   // Docker reports a failed `exec` on *stdout* ("OCI runtime exec failed:
   // ... executable file not found"), so an empty stdout is not enough to
   // distinguish "no procfs in the image" from a real listing.
-  if !output.stdout.contains("local_address") {
-    return None
+  if output.stdout.contains("local_address") {
+    return if parse_listening_ports(output.stdout).contains(container_port) {
+      Listening
+    } else {
+      NotListening
+    }
   }
-  Some(parse_listening_ports(output.stdout).contains(container_port))
+  // The exec failed: the image may have no `cat`, or the container may be
+  // dead. Never fall through to a host connect for a dead container: the
+  // userland proxy would accept the connection and report a stopped service as
+  // ready.
+  let status = match (Ok(self.status()) catch { e => Err(e) }) {
+    Ok(status) => status
+    Err(_) => "gone"
+  }
+  if status == "running" {
+    Unknown
+  } else {
+    Dead(status)
+  }
 }
 
 ///|
@@ -226,9 +251,10 @@ async fn Container::probe_tcp(
     None => return Fatal("port \{container_port} is not published")
   }
   match self.listening_inside(container_port) {
-    Some(true) => Ready
-    Some(false) => NotReady
-    None => self.probe_tcp_from_host(host_port)
+    Listening => Ready
+    NotListening => NotReady
+    Unknown => self.probe_tcp_from_host(host_port)
+    Dead(status) => Fatal(status)
   }
 }
 

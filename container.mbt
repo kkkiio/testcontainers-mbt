@@ -387,6 +387,14 @@ fn ContainerRequest::run_args(self : ContainerRequest) -> Array[String] {
   if self.auto_remove {
     args.push("--rm")
   }
+  // `Missing` is docker's default and `Always` is handled by an explicit
+  // pull in `ensure_image` (which reports `ImagePullFailed`). `Never` is the
+  // one policy the daemon has to enforce, otherwise `docker run` would
+  // happily pull a missing image.
+  if self.pull is Never {
+    args.push("--pull")
+    args.push("never")
+  }
   for pair in self.env {
     let (key, value) = pair
     args.push("--env")
@@ -527,6 +535,16 @@ async fn Container::resolve_ports(
     }
     if missing.length() == 0 {
       return
+    }
+    // A container that died before its ports were published will never
+    // publish them; report the real cause instead of waiting for the retry
+    // loop to run out.
+    let status = match (Ok(self.status()) catch { e => Err(e) }) {
+      Ok(status) => status
+      Err(_) => "gone"
+    }
+    if status != "running" {
+      raise ContainerNotRunning(container_id=self.id, status~)
     }
     attempt = attempt + 1
     if attempt < max_attempts {
