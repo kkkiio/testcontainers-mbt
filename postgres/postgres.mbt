@@ -1,6 +1,7 @@
 ///|
 /// Configuration for the Postgres module. All fields have sensible test
 /// defaults; pass labeled arguments to `new` to change them.
+#derive(Debug, Eq)
 pub(all) struct PostgresConfig {
   /// Docker image. Defaults to `postgres:16-alpine`.
   image : String
@@ -14,7 +15,7 @@ pub(all) struct PostgresConfig {
   port : Int32
   /// Readiness timeout in milliseconds.
   wait_timeout_ms : Int32
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend PostgresConfig with Eq::{equal, not_equal}
@@ -65,7 +66,7 @@ pub async fn run(
   port~ : Int32 = 5432,
   wait_timeout_ms~ : Int32 = 60_000,
   reuse~ : Bool = false,
-) -> PostgresContainer raise @testcontainers.TestContainerError {
+) -> PostgresContainer {
   let config = PostgresConfig::new(
     image~,
     database~,
@@ -121,9 +122,7 @@ pub fn PostgresContainer::host(self : PostgresContainer) -> String {
 
 ///|
 /// Host port the container's 5432 is published on.
-pub fn PostgresContainer::port(
-  self : PostgresContainer,
-) -> Int32 raise @testcontainers.TestContainerError {
+pub fn PostgresContainer::port(self : PostgresContainer) -> Int32 raise {
   self.container.host_port(self.config.port)
 }
 
@@ -154,7 +153,7 @@ pub fn PostgresContainer::password(self : PostgresContainer) -> String {
 pub fn PostgresContainer::connection_string(
   self : PostgresContainer,
   ssl_mode? : String,
-) -> String raise @testcontainers.TestContainerError {
+) -> String raise {
   let port = self.port()
   let base = "postgres://" +
     @percent.encode(self.config.username) +
@@ -172,14 +171,14 @@ pub fn PostgresContainer::connection_string(
 
 ///|
 /// Stop the container.
-pub async fn PostgresContainer::stop(
-  self : PostgresContainer,
-) -> Unit raise @testcontainers.TestContainerError {
+pub async fn PostgresContainer::stop(self : PostgresContainer) -> Unit {
   self.container.stop()
 }
 
 ///|
 /// Force-remove the container. Never raises, safe for `defer`.
-pub async fn PostgresContainer::cleanup(self : PostgresContainer) -> Unit {
+pub async fn PostgresContainer::cleanup(
+  self : PostgresContainer,
+) -> Unit noraise + nocancel {
   self.container.cleanup()
 }

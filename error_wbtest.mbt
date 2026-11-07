@@ -3,16 +3,16 @@ test "error messages are the user-facing diagnostics" {
   // Constructed with fixed ids, ports and logs: no Docker involved, no
   // randomness. One labelled transcript documents every variant at once.
   let id = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-  let cases : Array[(String, @testcontainers.TestContainerError)] = [
+  let cases : Array[(String, TestContainerError)] = [
     (
       "DockerNotAvailable",
-      @testcontainers.DockerNotAvailable(
+      DockerNotAvailable(
         "OSError(\"@process.run(): No such file or directory\")",
       ),
     ),
     (
       "DockerCommandFailed",
-      @testcontainers.DockerCommandFailed(
+      DockerCommandFailed(
         command="docker run --detach --publish 5432 postgres:16-alpine",
         code=125,
         stderr="docker: Error response from daemon: No such image",
@@ -20,43 +20,34 @@ test "error messages are the user-facing diagnostics" {
     ),
     (
       "ImagePullFailed",
-      @testcontainers.ImagePullFailed(
+      ImagePullFailed(
         image="ghcr.io/acme/private:1.0",
         stderr="denied: requested access to the resource is denied",
       ),
     ),
     (
       "WaitTimeout",
-      @testcontainers.WaitTimeout(
+      WaitTimeout(
         strategy="TCP port 5432",
         timeout_ms=60_000,
         logs="booting\nwaiting for connections",
       ),
     ),
-    (
-      "PortNotMapped",
-      @testcontainers.PortNotMapped(container_port=5432, container_id=id),
-    ),
+    ("PortNotMapped", PortNotMapped(container_port=5432, container_id=id)),
     (
       "InvalidRequest",
-      @testcontainers.InvalidRequest(
+      InvalidRequest(
         "bind mount source `data` must be an absolute host path; use `with_volume` for a docker named volume",
       ),
     ),
     (
       "ContainerNotRunning",
-      @testcontainers.ContainerNotRunning(container_id=id, status="exited"),
+      ContainerNotRunning(container_id=id, status="exited"),
     ),
     (
       "UnexpectedOutput",
-      @testcontainers.UnexpectedOutput(
+      UnexpectedOutput(
         "expected a container id on stdout, got: pulling from library/alpine",
-      ),
-    ),
-    (
-      "IoFailed",
-      @testcontainers.IoFailed(
-        "cannot create temporary directory: PermissionDenied",
       ),
     ),
   ]
@@ -75,7 +66,6 @@ test "error messages are the user-facing diagnostics" {
       #|  "[InvalidRequest]\ninvalid container request: bind mount source `data` must be an absolute host path; use `with_volume` for a docker named volume",
       #|  "[ContainerNotRunning]\ncontainer 0123456789ab is not running (status: exited)",
       #|  "[UnexpectedOutput]\nunexpected docker output: expected a container id on stdout, got: pulling from library/alpine",
-      #|  "[IoFailed]\nI/O error: cannot create temporary directory: PermissionDenied",
       #|]
     ),
   )

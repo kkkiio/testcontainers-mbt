@@ -73,9 +73,7 @@ fn redact_env_arg(arg : String) -> String {
 /// Returns the exit code and both output streams; a non-zero exit code is not
 /// turned into an error here because some callers (wait strategies, `exec`)
 /// treat it as data.
-pub async fn docker_command(
-  args : ArrayView[String],
-) -> CommandOutput raise TestContainerError {
+pub async fn docker_command(args : ArrayView[String]) -> CommandOutput {
   let (code, stdout, stderr) = @process.collect_output("docker", args) catch {
     e => raise DockerNotAvailable(e.to_string())
   }
@@ -96,9 +94,7 @@ pub async fn docker_command(
 ///|
 /// Run a docker command and fail with `DockerCommandFailed` on a non-zero exit
 /// code. Returns stdout.
-pub async fn docker(
-  args : ArrayView[String],
-) -> String raise TestContainerError {
+pub async fn docker(args : ArrayView[String]) -> String {
   let output = docker_command(args)
   if output.code != 0 {
     raise DockerCommandFailed(
@@ -128,7 +124,7 @@ pub fn command_error_text(output : CommandOutput) -> String {
 
 ///|
 /// `docker inspect` for a container, parsed as JSON.
-pub async fn inspect_container(id : String) -> Json raise TestContainerError {
+pub async fn inspect_container(id : String) -> Json {
   let stdout = docker(["inspect", "--type", "container", id])
   @json.parse(stdout) catch {
     e =>
@@ -141,7 +137,7 @@ pub async fn inspect_container(id : String) -> Json raise TestContainerError {
 ///|
 /// `docker inspect` for an image. Returns `false` when the image is not present
 /// locally.
-pub async fn image_exists(image : String) -> Bool raise TestContainerError {
+pub async fn image_exists(image : String) -> Bool {
   let output = docker_command(["image", "inspect", "--format", "{{.Id}}", image])
   if output.code == 0 {
     return true
@@ -161,7 +157,7 @@ pub async fn image_exists(image : String) -> Bool raise TestContainerError {
 ///|
 /// Pull `image`, unless it is already present locally and the request allows
 /// reusing it.
-pub async fn pull_image(image : String) -> Unit raise TestContainerError {
+pub async fn pull_image(image : String) -> Unit {
   let output = docker_command(["pull", image])
   if output.code != 0 {
     raise ImagePullFailed(image~, stderr=command_error_text(output))

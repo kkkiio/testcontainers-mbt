@@ -177,5 +177,4 @@ and add `myservice/myservice_test.mbt` that starts a real container.
    (`gh release create v<version> --draft`), review it, then Publish.
    `release.yml` triggers on `release: published`: it verifies the tag matches
    `moon.mod` and runs `moon publish` to mooncakes (needs the `MOONCAKES_TOKEN`
-   repo secret). Validation is CI's job on the pushed commit — the release
-   workflow only publishes the artifact.
+   repo secret).

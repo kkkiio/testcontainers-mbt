@@ -7,18 +7,19 @@ import {
 }
 
 // Values
-pub async fn run(image? : String, initial_buckets? : ArrayView[String], wait_timeout_ms? : Int, reuse? : Bool) -> S3MockContainer raise @testcontainers.TestContainerError
+pub async fn run(image? : String, initial_buckets? : ArrayView[String], wait_timeout_ms? : Int32, reuse? : Bool) -> S3MockContainer
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct S3MockConfig {
   image : String
   initial_buckets : Array[String]
-  wait_timeout_ms : Int
-} derive(Eq, @debug.Debug)
+  wait_timeout_ms : Int32
+}
 pub fn S3MockConfig::equal(Self, Self) -> Bool
-pub fn S3MockConfig::new(image? : String, initial_buckets? : ArrayView[String], wait_timeout_ms? : Int) -> Self
+pub fn S3MockConfig::new(image? : String, initial_buckets? : ArrayView[String], wait_timeout_ms? : Int32) -> Self
 pub fn S3MockConfig::not_equal(Self, Self) -> Bool
 pub fn S3MockConfig::to_repr(Self) -> @debug.Repr
 
@@ -27,14 +28,14 @@ pub struct S3MockContainer {
   config : S3MockConfig
 }
 pub fn S3MockContainer::access_key(Self) -> String
-pub async fn S3MockContainer::cleanup(Self) -> Unit
+pub async fn S3MockContainer::cleanup(Self) -> Unit noraise + nocancel
 pub fn S3MockContainer::container(Self) -> @testcontainers.Container
-pub fn S3MockContainer::endpoint(Self) -> String raise @testcontainers.TestContainerError
-pub fn S3MockContainer::https_endpoint(Self) -> String raise @testcontainers.TestContainerError
+pub fn S3MockContainer::endpoint(Self) -> String raise
+pub fn S3MockContainer::https_endpoint(Self) -> String raise
 pub fn S3MockContainer::initial_buckets(Self) -> Array[String]
 pub fn S3MockContainer::region(Self) -> String
 pub fn S3MockContainer::secret_key(Self) -> String
-pub async fn S3MockContainer::stop(Self) -> Unit raise @testcontainers.TestContainerError
+pub async fn S3MockContainer::stop(Self) -> Unit
 
 // Type aliases
 

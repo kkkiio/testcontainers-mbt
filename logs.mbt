@@ -1,5 +1,6 @@
 ///|
 /// Options for `docker logs`.
+#derive(Debug, Eq)
 pub(all) struct LogOptions {
   /// Only the last N lines (`--tail`).
   tail : Int32?
@@ -9,7 +10,7 @@ pub(all) struct LogOptions {
   since : String?
   /// Show logs before a timestamp or relative duration (`--until`).
   until : String?
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend LogOptions with Eq::{equal, not_equal}
@@ -67,10 +68,7 @@ fn logs_args(container_id : String, options : LogOptions) -> Array[String] {
 /// Docker keeps the two streams apart; they are concatenated here (stdout
 /// first). Use `logs_split` when the distinction matters. For readiness checks
 /// this is fine because application logs usually go to stderr.
-pub async fn Container::logs(
-  self : Container,
-  options? : LogOptions,
-) -> String raise TestContainerError {
+pub async fn Container::logs(self : Container, options? : LogOptions) -> String {
   let options = match options {
     Some(options) => options
     None => LogOptions::new()
@@ -84,7 +82,7 @@ pub async fn Container::logs(
 pub async fn Container::logs_split(
   self : Container,
   options? : LogOptions,
-) -> LogOutput raise TestContainerError {
+) -> LogOutput {
   let options = match options {
     Some(options) => options
     None => LogOptions::new()
@@ -101,10 +99,11 @@ pub async fn Container::logs_split(
 }
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct LogOutput {
   stdout : String
   stderr : String
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend LogOutput with Eq::{equal, not_equal}
@@ -162,7 +161,7 @@ pub async fn Container::stream_logs(
 /// Last `lines` lines of the logs, or an empty string when they cannot be read.
 /// Used to enrich error messages; never fails.
 async fn Container::logs_for_error(self : Container) -> String {
-  let result : Result[String, TestContainerError] = Ok(
+  let result : Result[String, Error] = Ok(
     self.logs(options=LogOptions::new(tail=200)),
   ) catch {
     e => Err(e)

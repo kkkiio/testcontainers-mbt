@@ -51,12 +51,12 @@ test "parse_container_id accepts only hex ids" {
   let id = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   assert_eq(parse_container_id(id + "\n"), id)
   assert_eq(parse_container_id("[::1]:1234\n" + id), id)
-  let result : Result[String, TestContainerError] = Ok(
+  let result : Result[String, Error] = Ok(
     parse_container_id("pulling from library/alpine\n"),
   ) catch {
     e => Err(e)
   }
-  assert_true(result is Err(UnexpectedOutput(_)))
+  assert_true(result is Err(TestContainerError::UnexpectedOutput(_)))
 }
 
 ///|
@@ -110,26 +110,22 @@ test "invalid requests are rejected before docker is called" {
   let relative_bind = ContainerRequest::new("alpine").with_bind(
     "relative/path", "/data",
   )
-  let result : Result[Unit, TestContainerError] = Ok(
-    validate_request(relative_bind),
-  ) catch {
+  let result : Result[Unit, Error] = Ok(validate_request(relative_bind)) catch {
     e => Err(e)
   }
-  assert_true(result is Err(InvalidRequest(_)))
+  assert_true(result is Err(TestContainerError::InvalidRequest(_)))
 
   let relative_target = ContainerRequest::new("alpine").with_tmpfs("data")
-  let result : Result[Unit, TestContainerError] = Ok(
-    validate_request(relative_target),
-  ) catch {
+  let result : Result[Unit, Error] = Ok(validate_request(relative_target)) catch {
     e => Err(e)
   }
-  assert_true(result is Err(InvalidRequest(_)))
+  assert_true(result is Err(TestContainerError::InvalidRequest(_)))
 
   let bad_port = ContainerRequest::new("alpine").with_port(70000)
-  let result : Result[Unit, TestContainerError] = Ok(validate_request(bad_port)) catch {
+  let result : Result[Unit, Error] = Ok(validate_request(bad_port)) catch {
     e => Err(e)
   }
-  assert_true(result is Err(InvalidRequest(_)))
+  assert_true(result is Err(TestContainerError::InvalidRequest(_)))
 }
 
 ///|
@@ -137,10 +133,10 @@ test "auto_remove cannot be combined with an exit wait" {
   let request = ContainerRequest::new("alpine")
     .with_auto_remove(true)
     .with_wait_for(WaitStrategy::Exit(0))
-  let result : Result[Unit, TestContainerError] = Ok(validate_request(request)) catch {
+  let result : Result[Unit, Error] = Ok(validate_request(request)) catch {
     e => Err(e)
   }
-  assert_true(result is Err(InvalidRequest(_)))
+  assert_true(result is Err(TestContainerError::InvalidRequest(_)))
 }
 
 ///|

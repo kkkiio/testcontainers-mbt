@@ -57,10 +57,10 @@ test "validate_request rejects reuse with auto_remove" {
   let request = ContainerRequest::new("alpine")
     .with_reuse()
     .with_auto_remove(true)
-  let result : Result[Unit, TestContainerError] = Ok(validate_request(request)) catch {
+  let result : Result[Unit, Error] = Ok(validate_request(request)) catch {
     e => Err(e)
   }
-  assert_true(result is Err(InvalidRequest(_)))
+  assert_true(result is Err(TestContainerError::InvalidRequest(_)))
 }
 
 // Each reuse test stamps a unique env marker into its request so the
