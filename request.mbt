@@ -1,5 +1,6 @@
 ///|
 /// Where a mount gets its content from.
+#derive(Debug, Eq)
 pub(all) enum MountSource {
   /// A path on the host, e.g. `/tmp/fixtures`.
   Bind(String)
@@ -7,10 +8,11 @@ pub(all) enum MountSource {
   Volume(String)
   /// An in-memory `tmpfs` mount.
   Tmpfs
-} derive(Debug, Eq)
+}
 
 ///|
 /// A mount inside the container.
+#derive(Debug, Eq)
 pub(all) struct Mount {
   /// Source of the data.
   source : MountSource
@@ -18,10 +20,11 @@ pub(all) struct Mount {
   target : String
   /// Mount read-only.
   read_only : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// Whether the image should be pulled before the container starts.
+#derive(Debug, Eq)
 pub(all) enum PullPolicy {
   /// Pull only when the image is not present locally (default).
   Missing
@@ -29,13 +32,14 @@ pub(all) enum PullPolicy {
   Always
   /// Never pull; fail if the image is missing.
   Never
-} derive(Debug, Eq)
+}
 
 ///|
 /// A condition that must hold before a started container is considered ready.
 ///
 /// Every strategy except `NoWait` and `Seconds` is polled until it holds or the
 /// request's `wait_timeout_ms` (default: 60 seconds) expires.
+#derive(Debug, Eq)
 pub(all) enum WaitStrategy {
   /// Do not wait: the container is considered ready as soon as docker started
   /// it. This is the default, matching testcontainers-go.
@@ -67,7 +71,7 @@ pub(all) enum WaitStrategy {
   All(Array[WaitStrategy])
   /// Wait until at least one strategy is satisfied.
   Any(Array[WaitStrategy])
-} derive(Debug, Eq)
+}
 
 ///|
 /// Promote trait methods to inherent methods (the compiler warns about implicit
@@ -127,6 +131,7 @@ fn describe_all(strategies : ArrayView[WaitStrategy]) -> String {
 ///   .with_env("POSTGRES_PASSWORD", "secret")
 ///   .with_wait_for(@testcontainers.WaitStrategy::TcpPort(5432))
 /// ```
+#derive(Debug, Eq)
 pub(all) struct ContainerRequest {
   /// Full image reference, e.g. `postgres:16-alpine`.
   image : String
@@ -164,7 +169,7 @@ pub(all) struct ContainerRequest {
   /// run (experimental). Only honored when `TESTCONTAINERS_REUSE_ENABLE` is
   /// set in the environment; see `with_reuse`.
   reuse : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// A new request for `image`.
@@ -511,9 +516,7 @@ fn is_absolute_path(path : String) -> Bool {
 
 ///|
 /// Reject requests that docker would fail on with a cryptic message.
-fn validate_request(
-  request : ContainerRequest,
-) -> Unit raise TestContainerError {
+fn validate_request(request : ContainerRequest) -> Unit raise {
   if request.image.trim().to_owned() == "" {
     raise InvalidRequest("image must not be empty")
   }

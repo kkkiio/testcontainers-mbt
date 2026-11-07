@@ -7,22 +7,23 @@ import {
 }
 
 // Values
-pub async fn run(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int, wait_timeout_ms? : Int, reuse? : Bool) -> MySqlContainer raise @testcontainers.TestContainerError
+pub async fn run(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int32, wait_timeout_ms? : Int32, reuse? : Bool) -> MySqlContainer
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct MySqlConfig {
   image : String
   database : String
   username : String
   password : String
   root_password : String
-  port : Int
-  wait_timeout_ms : Int
-} derive(Eq, @debug.Debug)
+  port : Int32
+  wait_timeout_ms : Int32
+}
 pub fn MySqlConfig::equal(Self, Self) -> Bool
-pub fn MySqlConfig::new(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int, wait_timeout_ms? : Int) -> Self
+pub fn MySqlConfig::new(image? : String, database? : String, username? : String, password? : String, root_password? : String, port? : Int32, wait_timeout_ms? : Int32) -> Self
 pub fn MySqlConfig::not_equal(Self, Self) -> Bool
 pub fn MySqlConfig::to_repr(Self) -> @debug.Repr
 
@@ -30,15 +31,15 @@ pub struct MySqlContainer {
   container : @testcontainers.Container
   config : MySqlConfig
 }
-pub async fn MySqlContainer::cleanup(Self) -> Unit
-pub fn MySqlContainer::connection_string(Self) -> String raise @testcontainers.TestContainerError
+pub async fn MySqlContainer::cleanup(Self) -> Unit noraise + nocancel
+pub fn MySqlContainer::connection_string(Self) -> String raise
 pub fn MySqlContainer::container(Self) -> @testcontainers.Container
 pub fn MySqlContainer::database(Self) -> String
-pub fn MySqlContainer::dsn(Self) -> String raise @testcontainers.TestContainerError
+pub fn MySqlContainer::dsn(Self) -> String raise
 pub fn MySqlContainer::host(Self) -> String
 pub fn MySqlContainer::password(Self) -> String
-pub fn MySqlContainer::port(Self) -> Int raise @testcontainers.TestContainerError
-pub async fn MySqlContainer::stop(Self) -> Unit raise @testcontainers.TestContainerError
+pub fn MySqlContainer::port(Self) -> Int32 raise
+pub async fn MySqlContainer::stop(Self) -> Unit
 pub fn MySqlContainer::username(Self) -> String
 
 // Type aliases

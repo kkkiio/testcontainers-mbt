@@ -31,9 +31,7 @@ priv enum Probe {
 
 ///|
 /// Wait for the request's wait strategy. Called by `ContainerRequest::start`.
-pub async fn Container::wait_ready(
-  self : Container,
-) -> Unit raise TestContainerError {
+pub async fn Container::wait_ready(self : Container) -> Unit {
   let timeout_ms = self.request.wait_timeout_ms
   let start = @async.now()
   let deadline = start + timeout_ms.to_int64()
@@ -49,7 +47,7 @@ pub async fn Container::wait_for(
   self : Container,
   strategy : WaitStrategy,
   timeout_ms? : Int32,
-) -> Unit raise TestContainerError {
+) -> Unit {
   let timeout_ms = match timeout_ms {
     Some(timeout_ms) => timeout_ms
     None => self.request.wait_timeout_ms
@@ -65,7 +63,7 @@ async fn Container::wait_until(
   start : Int64,
   deadline : Int64,
   timeout_ms : Int32,
-) -> Unit raise TestContainerError {
+) -> Unit {
   if strategy is NoWait {
     return
   }
@@ -369,7 +367,7 @@ async fn Container::probe_http(
 
 ///|
 async fn Container::probe_log(self : Container, message : String) -> Probe {
-  let result : Result[String, TestContainerError] = Ok(
+  let result : Result[String, Error] = Ok(
     self.logs(options=LogOptions::new(tail=WAIT_LOG_TAIL)),
   ) catch {
     e => Err(e)

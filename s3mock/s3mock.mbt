@@ -13,6 +13,7 @@ const S3MOCK_HTTPS_PORT : Int32 = 9191
 ///|
 /// Configuration for the S3Mock module. All fields have sensible test
 /// defaults; pass labeled arguments to `new` to change them.
+#derive(Debug, Eq)
 pub(all) struct S3MockConfig {
   /// Docker image. Defaults to `adobe/s3mock:3.9.1`.
   image : String
@@ -21,7 +22,7 @@ pub(all) struct S3MockConfig {
   /// Readiness timeout in milliseconds. S3Mock is a JVM application, so give it
   /// some time on a cold start.
   wait_timeout_ms : Int32
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend S3MockConfig with Eq::{equal, not_equal}
@@ -63,7 +64,7 @@ pub async fn run(
   initial_buckets~ : ArrayView[String] = [],
   wait_timeout_ms~ : Int32 = 60_000,
   reuse~ : Bool = false,
-) -> S3MockContainer raise @testcontainers.TestContainerError {
+) -> S3MockContainer {
   let config = S3MockConfig::new(image~, initial_buckets~, wait_timeout_ms~)
   let mut request = @testcontainers.ContainerRequest::new(config.image)
     .with_reuse(reuse~)
@@ -105,18 +106,14 @@ pub fn S3MockContainer::container(
 
 ///|
 /// HTTP endpoint of the S3 API, e.g. `http://localhost:32768`.
-pub fn S3MockContainer::endpoint(
-  self : S3MockContainer,
-) -> String raise @testcontainers.TestContainerError {
+pub fn S3MockContainer::endpoint(self : S3MockContainer) -> String raise {
   "http://" + self.container.endpoint(S3MOCK_HTTP_PORT)
 }
 
 ///|
 /// HTTPS endpoint of the S3 API. S3Mock uses a self-signed certificate, so
 /// clients need to disable certificate verification.
-pub fn S3MockContainer::https_endpoint(
-  self : S3MockContainer,
-) -> String raise @testcontainers.TestContainerError {
+pub fn S3MockContainer::https_endpoint(self : S3MockContainer) -> String raise {
   "https://" + self.container.endpoint(S3MOCK_HTTPS_PORT)
 }
 
@@ -149,14 +146,14 @@ pub fn S3MockContainer::region(_self : S3MockContainer) -> String {
 
 ///|
 /// Stop the container.
-pub async fn S3MockContainer::stop(
-  self : S3MockContainer,
-) -> Unit raise @testcontainers.TestContainerError {
+pub async fn S3MockContainer::stop(self : S3MockContainer) -> Unit {
   self.container.stop()
 }
 
 ///|
 /// Force-remove the container. Never raises, safe for `defer`.
-pub async fn S3MockContainer::cleanup(self : S3MockContainer) -> Unit {
+pub async fn S3MockContainer::cleanup(
+  self : S3MockContainer,
+) -> Unit noraise + nocancel {
   self.container.cleanup()
 }

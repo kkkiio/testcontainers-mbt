@@ -70,9 +70,7 @@ fn ascii_lower(text : String) -> String {
 /// the same configuration, or create one. The container keeps running after
 /// the test; `Container::cleanup` leaves it alone and `Container::remove`
 /// deletes it explicitly.
-async fn ContainerRequest::start_reusable(
-  self : ContainerRequest,
-) -> Container raise TestContainerError {
+async fn ContainerRequest::start_reusable(self : ContainerRequest) -> Container {
   self.ensure_image()
   let hash = self.reuse_hash()
   for attempt = 0; attempt < 50; attempt = attempt + 1 {
@@ -106,7 +104,7 @@ async fn ContainerRequest::start_reusable(
 async fn ContainerRequest::adopt(
   self : ContainerRequest,
   id : String,
-) -> Container? raise TestContainerError {
+) -> Container? {
   match container_status(id) {
     None => None
     Some(status) => {
@@ -142,7 +140,7 @@ async fn ContainerRequest::adopt(
 async fn ContainerRequest::create_reusable(
   self : ContainerRequest,
   hash : String,
-) -> Container? raise TestContainerError {
+) -> Container? {
   let name = match self.name {
     Some(name) => name
     None => "testcontainers-mbt-reuse-\{hash}"
@@ -170,7 +168,7 @@ async fn ContainerRequest::create_reusable(
     host: docker_host(),
     reusable: true,
   }
-  let prepared : Result[Unit, TestContainerError] = Ok(
+  let prepared : Result[Unit, Error] = Ok(
     {
       container.resolve_ports()
       if request.wait != WaitStrategy::NoWait {
@@ -234,10 +232,7 @@ fn hex64(value : UInt64) -> String {
 ///|
 /// Ids of containers carrying `label` (`name=value`). `all` includes stopped
 /// containers.
-async fn find_containers(
-  label : String,
-  all~ : Bool,
-) -> Array[String] raise TestContainerError {
+async fn find_containers(label : String, all~ : Bool) -> Array[String] {
   let args : Array[String] = ["ps"]
   args.push(if all { "-aq" } else { "-q" })
   // Full 64-char ids, so an adopted container reports the same id as the
@@ -259,7 +254,7 @@ async fn find_containers(
 ///|
 /// The docker-reported state of a container (`running`, `exited`, ...), or
 /// `None` when it does not exist.
-async fn container_status(id : String) -> String? raise TestContainerError {
+async fn container_status(id : String) -> String? {
   let output = docker_command([
     "inspect", "--type", "container", "--format", "{{.State.Status}}", id,
   ])
@@ -273,7 +268,7 @@ async fn container_status(id : String) -> String? raise TestContainerError {
 ///|
 /// Make sure a container is running: start it when it is stopped. Returns
 /// `false` when it cannot be started (or no longer exists).
-async fn ensure_started(id : String) -> Bool raise TestContainerError {
+async fn ensure_started(id : String) -> Bool {
   match container_status(id) {
     Some("running") => true
     Some(_) => {

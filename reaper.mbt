@@ -58,7 +58,7 @@ let session : Ref[String?] = Ref(None)
 ///|
 /// Make sure a ryuk container is running and this process has registered its
 /// session filter with it. No-op when `TESTCONTAINERS_RYUK_DISABLED` is set.
-async fn ensure_reaper() -> Unit raise TestContainerError {
+async fn ensure_reaper() -> Unit {
   if reaper_disabled() || reaper.val is Some(_) {
     return
   }
@@ -77,9 +77,9 @@ async fn ensure_reaper() -> Unit raise TestContainerError {
   // port asynchronously: a connection made right after `docker run` can be
   // accepted and then dropped without ever reaching ryuk. Verify each
   // attempt by reading ryuk's ACK reply and retry until one sticks.
-  let mut failure : TestContainerError? = None
+  let mut failure : Error? = None
   for attempt = 0; attempt < 25; attempt = attempt + 1 {
-    let attempt_result : Result[@socket.Tcp, TestContainerError] = Ok(
+    let attempt_result : Result[@socket.Tcp, Error] = Ok(
       register_reaper_filters(host, port, session_id),
     ) catch {
       e => Err(e)
@@ -118,7 +118,7 @@ async fn register_reaper_filters(
   host : String,
   port : Int32,
   session_id : String,
-) -> @socket.Tcp raise TestContainerError {
+) -> @socket.Tcp {
   let endpoint = join_host_port(host, port)
   let tcp = @async.with_timeout_opt(5_000, () => {
     @socket.Tcp::connect_to_host(host, port~)
@@ -175,9 +175,7 @@ fn reaper_disabled() -> Bool {
 /// Find the running ryuk container, or start one. Concurrent test processes
 /// are deduplicated by the fixed `REAPER_NAME`: a `docker run` that loses the
 /// name race loops back and attaches to the winner.
-async fn reaper_container(
-  session_id : String,
-) -> String raise TestContainerError {
+async fn reaper_container(session_id : String) -> String {
   for attempt = 0; attempt < 50; attempt = attempt + 1 {
     match find_containers("\{LABEL_RYUK}=true", all=true) {
       [id, ..] => if ensure_started(id) { return id }
@@ -265,10 +263,7 @@ fn docker_socket_path() -> String {
 ///|
 /// The host port a container publishes `container_port` on, with a short
 /// retry because docker fills in the binding asynchronously.
-async fn published_port(
-  id : String,
-  container_port : Int32,
-) -> Int32 raise TestContainerError {
+async fn published_port(id : String, container_port : Int32) -> Int32 {
   for attempt = 0; attempt < 50; attempt = attempt + 1 {
     let json = inspect_container(id)
     let bindings = match json_index(json, 0) {

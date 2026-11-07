@@ -1,6 +1,7 @@
 ///|
 /// Configuration for the MySQL module. All fields have sensible test
 /// defaults; pass labeled arguments to `new` to change them.
+#derive(Debug, Eq)
 pub(all) struct MySqlConfig {
   /// Docker image. Defaults to `mysql:8.4` (the current LTS release).
   image : String
@@ -18,7 +19,7 @@ pub(all) struct MySqlConfig {
   port : Int32
   /// Readiness timeout in milliseconds.
   wait_timeout_ms : Int32
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend MySqlConfig with Eq::{equal, not_equal}
@@ -65,7 +66,7 @@ pub async fn run(
   port~ : Int32 = 3306,
   wait_timeout_ms~ : Int32 = 90_000,
   reuse~ : Bool = false,
-) -> MySqlContainer raise @testcontainers.TestContainerError {
+) -> MySqlContainer {
   let config = MySqlConfig::new(
     image~,
     database~,
@@ -129,9 +130,7 @@ pub fn MySqlContainer::host(self : MySqlContainer) -> String {
 
 ///|
 /// Host port the container's 3306 is published on.
-pub fn MySqlContainer::port(
-  self : MySqlContainer,
-) -> Int32 raise @testcontainers.TestContainerError {
+pub fn MySqlContainer::port(self : MySqlContainer) -> Int32 raise {
   self.container.host_port(self.config.port)
 }
 
@@ -155,9 +154,7 @@ pub fn MySqlContainer::password(self : MySqlContainer) -> String {
 
 ///|
 /// `mysql://user:password@host:port/database`.
-pub fn MySqlContainer::connection_string(
-  self : MySqlContainer,
-) -> String raise @testcontainers.TestContainerError {
+pub fn MySqlContainer::connection_string(self : MySqlContainer) -> String raise {
   "mysql://" +
   @percent.encode(self.config.username) +
   ":" +
@@ -171,9 +168,7 @@ pub fn MySqlContainer::connection_string(
 ///|
 /// Go-style DSN used by `go-sql-driver/mysql` and several MoonBit drivers:
 /// `user:password@tcp(host:port)/database`.
-pub fn MySqlContainer::dsn(
-  self : MySqlContainer,
-) -> String raise @testcontainers.TestContainerError {
+pub fn MySqlContainer::dsn(self : MySqlContainer) -> String raise {
   self.config.username +
   ":" +
   self.config.password +
@@ -185,14 +180,14 @@ pub fn MySqlContainer::dsn(
 
 ///|
 /// Stop the container.
-pub async fn MySqlContainer::stop(
-  self : MySqlContainer,
-) -> Unit raise @testcontainers.TestContainerError {
+pub async fn MySqlContainer::stop(self : MySqlContainer) -> Unit {
   self.container.stop()
 }
 
 ///|
 /// Force-remove the container. Never raises, safe for `defer`.
-pub async fn MySqlContainer::cleanup(self : MySqlContainer) -> Unit {
+pub async fn MySqlContainer::cleanup(
+  self : MySqlContainer,
+) -> Unit noraise + nocancel {
   self.container.cleanup()
 }

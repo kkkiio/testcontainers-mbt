@@ -15,5 +15,5 @@ description = "Throwaway Docker containers for MoonBit integration tests"
 preferred_target = "native"
 
 import {
-  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.7",
 }

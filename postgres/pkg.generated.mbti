@@ -7,21 +7,22 @@ import {
 }
 
 // Values
-pub async fn run(image? : String, database? : String, username? : String, password? : String, port? : Int, wait_timeout_ms? : Int, reuse? : Bool) -> PostgresContainer raise @testcontainers.TestContainerError
+pub async fn run(image? : String, database? : String, username? : String, password? : String, port? : Int32, wait_timeout_ms? : Int32, reuse? : Bool) -> PostgresContainer
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct PostgresConfig {
   image : String
   database : String
   username : String
   password : String
-  port : Int
-  wait_timeout_ms : Int
-} derive(Eq, @debug.Debug)
+  port : Int32
+  wait_timeout_ms : Int32
+}
 pub fn PostgresConfig::equal(Self, Self) -> Bool
-pub fn PostgresConfig::new(image? : String, database? : String, username? : String, password? : String, port? : Int, wait_timeout_ms? : Int) -> Self
+pub fn PostgresConfig::new(image? : String, database? : String, username? : String, password? : String, port? : Int32, wait_timeout_ms? : Int32) -> Self
 pub fn PostgresConfig::not_equal(Self, Self) -> Bool
 pub fn PostgresConfig::to_repr(Self) -> @debug.Repr
 
@@ -29,14 +30,14 @@ pub struct PostgresContainer {
   container : @testcontainers.Container
   config : PostgresConfig
 }
-pub async fn PostgresContainer::cleanup(Self) -> Unit
-pub fn PostgresContainer::connection_string(Self, ssl_mode? : String) -> String raise @testcontainers.TestContainerError
+pub async fn PostgresContainer::cleanup(Self) -> Unit noraise + nocancel
+pub fn PostgresContainer::connection_string(Self, ssl_mode? : String) -> String raise
 pub fn PostgresContainer::container(Self) -> @testcontainers.Container
 pub fn PostgresContainer::database(Self) -> String
 pub fn PostgresContainer::host(Self) -> String
 pub fn PostgresContainer::password(Self) -> String
-pub fn PostgresContainer::port(Self) -> Int raise @testcontainers.TestContainerError
-pub async fn PostgresContainer::stop(Self) -> Unit raise @testcontainers.TestContainerError
+pub fn PostgresContainer::port(Self) -> Int32 raise
+pub async fn PostgresContainer::stop(Self) -> Unit
 pub fn PostgresContainer::username(Self) -> String
 
 // Type aliases

@@ -4,7 +4,8 @@
 /// The payloads carry enough context to debug a failed test without re-running
 /// it: the exact docker command, the exit status, the container's output and,
 /// for wait timeouts, the container logs.
-pub(all) suberror TestContainerError {
+#derive(Debug)
+pub suberror TestContainerError {
   /// The `docker` executable could not be spawned at all. This usually means
   /// Docker is not installed or not on `PATH`.
   DockerNotAvailable(String)
@@ -22,9 +23,7 @@ pub(all) suberror TestContainerError {
   ContainerNotRunning(container_id~ : String, status~ : String)
   /// Output of a docker command could not be parsed.
   UnexpectedOutput(String)
-  /// A filesystem operation outside docker failed (e.g. creating a temp dir).
-  IoFailed(String)
-} derive(Debug)
+}
 
 ///|
 pub impl Show for TestContainerError with fn to_string(self) {
@@ -51,7 +50,6 @@ pub impl Show for TestContainerError with fn to_string(self) {
     ContainerNotRunning(container_id~, status~) =>
       "container \{short_id(container_id)} is not running (status: \{status})"
     UnexpectedOutput(message) => "unexpected docker output: \{message}"
-    IoFailed(message) => "I/O error: \{message}"
   }
 }
 

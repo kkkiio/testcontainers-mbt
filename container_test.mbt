@@ -38,12 +38,12 @@ async test "exec runs inside the container" {
   assert_eq(result.code, 3)
   assert_eq(result.stdout.trim().to_owned(), "out")
   assert_eq(result.stderr.trim().to_owned(), "err")
-  let failing : Result[String, @testcontainers.TestContainerError] = Ok(
-    container.exec_checked(["false"]),
-  ) catch {
-    e => Err(e)
+  try container.exec_checked(["false"]) catch {
+    @testcontainers.TestContainerError::DockerCommandFailed(_) => ()
+    error => fail("expected DockerCommandFailed, got \{error.to_string()}")
+  } noraise {
+    _ => fail("expected exec to fail")
   }
-  assert_true(failing is Err(DockerCommandFailed(_)))
 }
 
 ///|
@@ -62,12 +62,12 @@ async test "ports are published on random host ports" {
   assert_eq(container.host_port_opt(8080), Some(port))
   assert_eq(container.host_port_opt(9999), None)
   assert_eq(container.endpoint(8080), "\{container.host()}:\{port}")
-  let missing : Result[Int32, @testcontainers.TestContainerError] = Ok(
-    container.host_port(9999),
-  ) catch {
-    e => Err(e)
+  try container.host_port(9999) catch {
+    @testcontainers.TestContainerError::PortNotMapped(_) => ()
+    error => fail("expected PortNotMapped, got \{error.to_string()}")
+  } noraise {
+    _ => fail("expected host_port to fail")
   }
-  assert_true(missing is Err(PortNotMapped(_)))
 }
 
 ///|
@@ -122,25 +122,23 @@ async test "timeout errors carry the logs and remove the container" {
     .with_cmd(["sh", "-c", "echo booting; sleep 60"])
     .with_wait_for(@testcontainers.WaitStrategy::TcpPort(9999))
     .with_wait_timeout_ms(1500)
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    @testcontainers.TestContainerError::WaitTimeout(
+      strategy~,
+      timeout_ms~,
+      logs~
+    ) => {
+      assert_eq(strategy, "TCP port 9999")
+      assert_eq(timeout_ms, 1_500)
+      // The container's own output is included in the error.
+      assert_eq(logs, "booting")
+    }
+    error => fail("expected WaitTimeout, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected the wait strategy to time out")
     }
-    Err(error) =>
-      match error {
-        WaitTimeout(strategy~, timeout_ms~, logs~) => {
-          assert_eq(strategy, "TCP port 9999")
-          assert_eq(timeout_ms, 1_500)
-          // The container's own output is included in the error.
-          assert_eq(logs, "booting")
-        }
-        _ => fail("expected WaitTimeout, got \{error.to_string()}")
-      }
   }
   // A failed start must not leak the half-started container.
   let leftovers = @testcontainers.docker([
@@ -160,22 +158,17 @@ async test "a dead container fails fast instead of timing out" {
     .with_cmd(["sh", "-c", "echo crashing; exit 7"])
     .with_wait_for(@testcontainers.WaitStrategy::TcpPort(1234))
     .with_wait_timeout_ms(30_000)
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    // The published port must not be reported ready just because docker's
+    // userland proxy accepts the host connection.
+    @testcontainers.TestContainerError::ContainerNotRunning(status~, ..) =>
+      assert_eq(status, "exited")
+    error => fail("expected ContainerNotRunning, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected the wait to fail")
     }
-    Err(error) =>
-      match error {
-        // The published port must not be reported ready just because docker's
-        // userland proxy accepts the host connection.
-        ContainerNotRunning(status~, ..) => assert_eq(status, "exited")
-        _ => fail("expected ContainerNotRunning, got \{error.to_string()}")
-      }
   }
 }
 
@@ -238,21 +231,15 @@ async test "pulling a missing image fails with a useful error" {
   let request = @testcontainers.ContainerRequest::new(
     "testcontainers-mbt-does-not-exist:nope",
   )
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    @testcontainers.TestContainerError::ImagePullFailed(image~, ..) =>
+      assert_eq(image, "testcontainers-mbt-does-not-exist:nope")
+    error => fail("expected ImagePullFailed, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected the image pull to fail")
     }
-    Err(error) =>
-      match error {
-        ImagePullFailed(image~, ..) =>
-          assert_eq(image, "testcontainers-mbt-does-not-exist:nope")
-        _ => fail("expected ImagePullFailed, got \{error.to_string()}")
-      }
   }
 }
 
@@ -330,24 +317,18 @@ async test "pull policy never fails when the image is missing" {
   let request = @testcontainers.ContainerRequest::new(
     "testcontainers-mbt-does-not-exist:nope",
   ).with_pull_policy(@testcontainers.PullPolicy::Never)
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    // No pull is attempted: docker itself reports the missing image.
+    @testcontainers.TestContainerError::DockerCommandFailed(code~, stderr~, ..) => {
+      assert_eq(code, 125)
+      assert_true(stderr.contains("No such image"))
+    }
+    error => fail("expected DockerCommandFailed, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected docker run to fail for a missing image")
     }
-    Err(error) =>
-      match error {
-        // No pull is attempted: docker itself reports the missing image.
-        DockerCommandFailed(code~, stderr~, ..) => {
-          assert_eq(code, 125)
-          assert_true(stderr.contains("No such image"))
-        }
-        _ => fail("expected DockerCommandFailed, got \{error.to_string()}")
-      }
   }
 }
 
@@ -357,23 +338,17 @@ async test "healthy strategy rejects images without a health check" {
     .with_cmd(["sleep", "30"])
     .with_wait_for(@testcontainers.WaitStrategy::Healthy)
     .with_wait_timeout_ms(30_000)
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    @testcontainers.TestContainerError::ContainerNotRunning(status~, ..) =>
+      assert_eq(
+        status, "the image has no HEALTHCHECK; use another WaitStrategy or add a HEALTHCHECK to the image",
+      )
+    error => fail("expected ContainerNotRunning, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected the health check wait to fail")
     }
-    Err(error) =>
-      match error {
-        ContainerNotRunning(status~, ..) =>
-          assert_eq(
-            status, "the image has no HEALTHCHECK; use another WaitStrategy or add a HEALTHCHECK to the image",
-          )
-        _ => fail("expected ContainerNotRunning, got \{error.to_string()}")
-      }
   }
 }
 
@@ -432,25 +407,19 @@ async test "a hanging exec probe cannot exceed the wait timeout" {
       @testcontainers.WaitStrategy::Exec(["sh", "-c", "sleep 600"]),
     )
     .with_wait_timeout_ms(1_500)
-  let result : Result[
-    @testcontainers.Container,
-    @testcontainers.TestContainerError,
-  ] = Ok(request.start()) catch { e => Err(e) }
-  let elapsed = @async.now() - started
-  match result {
-    Ok(container) => {
+  try request.start() catch {
+    @testcontainers.TestContainerError::WaitTimeout(strategy~, timeout_ms~, ..) => {
+      assert_eq(strategy, "exec `sh -c sleep 600`")
+      assert_eq(timeout_ms, 1_500)
+    }
+    error => fail("expected WaitTimeout, got \{error.to_string()}")
+  } noraise {
+    container => {
       container.cleanup()
       fail("expected the exec wait to time out")
     }
-    Err(error) =>
-      match error {
-        WaitTimeout(strategy~, timeout_ms~, ..) => {
-          assert_eq(strategy, "exec `sh -c sleep 600`")
-          assert_eq(timeout_ms, 1_500)
-        }
-        _ => fail("expected WaitTimeout, got \{error.to_string()}")
-      }
   }
+  let elapsed = @async.now() - started
   // The probe is cancelled at the deadline; allow generous slack for cleanup.
   assert_true(elapsed < 10_000)
 }
@@ -461,24 +430,19 @@ async test "wait_for reports the effective timeout" {
     .with_cmd(["sleep", "30"])
     .start()
   defer container.cleanup()
-  let result : Result[Unit, @testcontainers.TestContainerError] = Ok(
+  try
     container.wait_for(
       @testcontainers.WaitStrategy::LogMessage("never-appears"),
       timeout_ms=500,
-    ),
-  ) catch {
-    e => Err(e)
-  }
-  match result {
-    Ok(_) => fail("expected the wait to time out")
-    Err(error) =>
-      match error {
-        WaitTimeout(timeout_ms~, logs~, ..) => {
-          assert_eq(timeout_ms, 500)
-          assert_eq(logs, "")
-        }
-        _ => fail("expected WaitTimeout, got \{error.to_string()}")
-      }
+    )
+  catch {
+    @testcontainers.TestContainerError::WaitTimeout(timeout_ms~, logs~, ..) => {
+      assert_eq(timeout_ms, 500)
+      assert_eq(logs, "")
+    }
+    error => fail("expected WaitTimeout, got \{error.to_string()}")
+  } noraise {
+    _ => fail("expected the wait to time out")
   }
 }
 
