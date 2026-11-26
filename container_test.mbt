@@ -126,7 +126,7 @@ async test "timeout errors carry the logs and remove the container" {
     @testcontainers.TestContainerError::WaitTimeout(
       strategy~,
       timeout_ms~,
-      logs~
+      logs~,
     ) => {
       assert_eq(strategy, "TCP port 9999")
       assert_eq(timeout_ms, 1_500)
